@@ -10,10 +10,9 @@ OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Chuối Chiên TV"
 DEFAULT_LOGO = "https://raw.githubusercontent.com/iptv-org/iptv/master/logos/sports.png"
 
-# Các từ khóa của banner quảng cáo / giới thiệu cần LOẠI BỎ
 IGNORE_KEYWORDS = [
     'về chuoichien', 'về chuối chiên', 'trang chủ', 'giới thiệu', 'điều khoản',
-    'chính sách', 'liên hệ', 'quảng cáo', 'tải app', 'bảng xếp hạng', 'lịch thi đấu'
+    'chính sách', 'liên hệ', 'quảng cáo', 'tải app', 'bảng xếp hạng', 'lịch thi đấu', 'cookie', 'đăng nhập'
 ]
 
 LEAGUE_KEYWORDS = [
@@ -48,14 +47,12 @@ def is_league_or_status(text):
 def parse_match_card(text, raw_logo):
     lines = [l.strip() for l in text.split('\n') if l.strip()]
 
-    # 1. Trích xuất thời gian
     time_match = re.search(r'(\d{1,2}:\d{2})', text)
     date_match = re.search(r'(\d{1,2}/\d{1,2})', text)
     m_time = time_match.group(1) if time_match else ("LIVE" if "LIVE" in text.upper() or "TRỰC TIẾP" in text.upper() else "")
     m_date = date_match.group(1) if date_match else ""
     time_str = f"{m_time} {m_date}".strip() or "LIVE"
 
-    # 2. Trích xuất tên BLV
     blv_str = ""
     blv_match = re.search(r'(?:BLV|Chuối)\s+([A-Za-zÀ-ỹ0-9\s]+)', text, re.IGNORECASE) or re.search(r'\(([^)]+)\)', text)
     if blv_match:
@@ -63,7 +60,6 @@ def parse_match_card(text, raw_logo):
         if any(k in blv_name.lower() for k in ['chuối', 'blv']):
             blv_str = f" ({blv_name})"
 
-    # 3. Phân tích tên Đội Nhà vs Đội Khách
     teams_str = ""
     vs_idx = -1
     for idx, line in enumerate(lines):
@@ -150,31 +146,35 @@ def run_scraper():
 
         try:
             print(f"[*] Đang tải trang chủ: {BASE_URL}")
-            page.goto(BASE_URL, timeout=40000, wait_until="networkidle")
-            
-            # Cuộn trang xuống để kích hoạt lazy loading hình ảnh và trận đấu
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
-            time.sleep(2)
-            page.evaluate("window.scrollTo(0, 0)")
+            page.goto(BASE_URL, timeout=40000, wait_until="domcontentloaded")
+            page.wait_for_timeout(5000)
+
+            # Cuộn trang để kích hoạt nội dung
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight / 3)")
             time.sleep(2)
 
             raw_matches = page.evaluate('''() => {
                 const matches = [];
-                // Bắt tất cả thẻ chứa liên kết trận đấu
-                const allLinks = Array.from(document.querySelectorAll('a[href*="/truc-tiep/"], a[href*="/match/"], a[href*="/xem/"], a[href*="/live/"]'));
+                // Quét rộng toàn bộ các thẻ a có khả năng chứa trận đấu
+                const allLinks = Array.from(document.querySelectorAll('a'));
 
                 allLinks.forEach(link => {
                     const href = link.getAttribute('href');
                     if (!href || href === '#' || href.startsWith('javascript')) return;
+                    
+                    // Chỉ lấy các link dẫn đến trang xem trực tiếp hoặc chi tiết trận
+                    if (!href.includes('/truc-tiep/') && !href.includes('/match/') && !href.includes('/xem/') && !href.includes('/live/') && !href.includes('/room/')) {
+                        return;
+                    }
 
-                    # Lấy thẻ cha chứa toàn bộ thông tin card trận đấu
-                    let parentCard = link.closest('.match-item') || link.closest('.card-match') || link.closest('.item-match') || link.closest('div[class*="match"]') || link;
+                    const card = link.closest('div') || link;
+                    const fullText = card.innerText || link.innerText || '';
 
                     let logo = '';
-                    const imgs = Array.from(parentCard.querySelectorAll('img'));
+                    const imgs = Array.from(card.querySelectorAll('img'));
                     for (let img of imgs) {
-                        let src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || '';
-                        if (src && !src.includes('favicon') && !src.includes('icon-') && !src.includes('bg-')) {
+                        let src = img.getAttribute('src') || img.getAttribute('data-src') || '';
+                        if (src && !src.includes('favicon') && !src.includes('icon')) {
                             logo = src.startsWith('http') ? src : window.location.origin + src;
                             break;
                         }
@@ -183,7 +183,7 @@ def run_scraper():
                     matches.push({
                         url: href.startsWith('http') ? href : window.location.origin + href,
                         logo: logo,
-                        fullText: parentCard.innerText || link.innerText || ''
+                        fullText: fullText
                     });
                 });
 
@@ -197,7 +197,6 @@ def run_scraper():
                 if not text or url in unique_matches:
                     continue
 
-                # Loại bỏ các ô bài viết quảng cáo / giới thiệu
                 text_lower = text.lower()
                 if any(ignore_kw in text_lower for ignore_kw in IGNORE_KEYWORDS):
                     continue
@@ -213,21 +212,20 @@ def run_scraper():
             match_list = list(unique_matches.values())
             page.close()
 
-            print(f"[*] Tìm thấy {len(match_list)} trận đấu từ {BASE_URL}. Bắt đầu bóc tách stream m3u8...")
+            print(f"[*] Tìm thấy {len(match_list)} trận đấu. Đang lấy link m3u8...")
             for idx, match in enumerate(match_list):
-                print(f"[{idx+1}/{len(match_list)}] Lấy link stream: {match['title']}")
+                print(f"[{idx+1}/{len(match_list)}] Lấy link: {match['title']}")
                 m3u8_url = get_m3u8_for_match(context, match['url'])
                 match['m3u8_url'] = m3u8_url
 
             final_matches = match_list
 
         except Exception as e:
-            print(f"[!] Lỗi khi cào dữ liệu từ {BASE_URL}: {e}")
+            print(f"[!] Lỗi: {e}")
             page.close()
 
         browser.close()
 
-    # Xuất file playlist.m3u
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n\n")
 
@@ -245,7 +243,7 @@ def run_scraper():
             f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{item["title"]}\n')
             f.write(f'{stream_url}\n\n')
 
-    print(f"[*] Hoàn tất! Đã xuất file {OUTPUT_FILE}")
+    print(f"[*] Hoàn tất xuất file {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     run_scraper()
