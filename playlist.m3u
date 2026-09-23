@@ -1,0 +1,47 @@
+#EXTM3U
+
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_111302_1a271a3c.png" group-title="Chuối Chiến TV",12:30 23/09 ⚽ China Pr U23 vs Uae U23 (Chuối Tây) [hls]
+#EXTVLCOPT:http-referrer=https://chuoichientv.com/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+https://live07.chuoichientv.me/live/1639462/china-pr-u23-vs-uae-u23|Referer=https://chuoichientv.com/&User-Agent=Mozilla/5.0
+
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_111302_1a271a3c.png" group-title="Chuối Chiến TV",12:30 23/09 ⚽ U23 Iran vs Korea Dpr U23 (Chuối Nhỏ) [hls]
+#EXTVLCOPT:http-referrer=https://chuoichientv.com/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+https://live07.chuoichientv.me/live/1639469/u23-iran-vs-korea-dpr-u23|Referer=https://chuoichientv.com/&User-Agent=Mozilla/5.0
+
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115528_7b70e6f1.png" group-title="Chuối Chiến TV",15:00 23/09 ⚽ Gamba Osaka vs Tokushima Vortis (Chuối To) [hls]
+#EXTVLCOPT:http-referrer=https://chuoichientv.com/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+https://live07.chuoichientv.me/live/1635582/gamba-osaka-vs-tokushima-vortis|Referer=https://chuoichientv.com/&User-Agent=Mozilla/5.0
+
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_111302_1a271a3c.png" group-title="Chuối Chiến TV",17:30 23/09 ⚽ Japan U23 vs U23 Thailand [hls]
+#EXTVLCOPT:http-referrer=https://chuoichientv.com/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+https://live07.chuoichientv.me/live/1639463/japan-u23-vs-u23-thailand-|Referer=https://chuoichientv.com/&User-Agent=Mozilla/5.0
+
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_111302_1a271a3c.png" group-title="Chuối Chiến TV",17:30 23/09 ⚽ Kyrgyz Republic U23 vs U23 Hong Kong (Chuối Lá) [hls]
+#EXTVLCOPT:http-referrer=https://chuoichientv.com/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+https://live07.chuoichientv.me/live/1639464/kyrgyz-republic-u23-vs-u23-hong-kong-|Referer=https://chuoichientv.com/&User-Agent=Mozilla/5.0
+
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115955_c0441162.png" group-title="Chuối Chiến TV",20:00 23/09 ⚽ Malawi U20 vs Comoros U20 (Chuối Chao) [hls]
+#EXTVLCOPT:http-referrer=https://chuoichientv.com/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+https://live07.chuoichientv.me/live/1640460/malawi-u20-vs-comoros-u20|Referer=https://chuoichientv.com/&User-Agent=Mozilla/5.0
+
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_120223_63e33604.png" group-title="Chuối Chiến TV",20:00 23/09 ⚽ Italy U20 W vs Spain U20 (Chuối Nhỏ) [hls]
+#EXTVLCOPT:http-referrer=https://chuoichientv.com/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+https://live07.chuoichientv.me/live/1640769/italy-u20-w-vs-spain-u20|Referer=https://chuoichientv.com/&User-Agent=Mozilla/5.0
+
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115853_8f760790.png" group-title="Chuối Chiến TV",21:00 23/09 ⚽ Kladno vs Bank Ostrava (Chuối Tây) [hls]
+#EXTVLCOPT:http-referrer=https://chuoichientv.com/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+https://live07.chuoichientv.me/live/1636726/kladno-vs-bank-ostrava|Referer=https://chuoichientv.com/&User-Agent=Mozilla/5.0
+
+#EXTINF:-1 tvg-logo="https://res.cloudinary.com/dv7zv6ltc/image/upload/v1747065042/chuoi_chien/articles/a0pdxvpsvvnkwhcctmml.png" group-title="Chuối Chiến TV",21:00 23/09 ⚽ Italy vs Finland (Chuối Kem) [hls]
+#EXTVLCOPT:http-referrer=https://chuoichientv.com/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+https://live07.chuoichientv.me/live/998734/italy-vs-finland|Referer=https://chuoichientv.com/&User-Agent=Mozilla/5.0
+
