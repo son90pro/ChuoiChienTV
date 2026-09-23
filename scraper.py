@@ -6,14 +6,14 @@ from playwright.sync_api import sync_playwright
 # Tên miền Cloudflare Worker của anh Sơn
 WORKER_DOMAIN = "cctv.sonnguyen90pro.workers.dev"
 
-# Chỉ lấy nguồn duy nhất từ Chuối Chiên TV
-BASE_URL = "https://chuoichientv.com"
+# Tên miền nguồn chuẩn mới của Chuối Chiên TV
+BASE_URL = "https://chuoichientv1.link"
 
 OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Chuối Chiên TV"
 DEFAULT_LOGO = "https://raw.githubusercontent.com/iptv-org/iptv/master/logos/sports.png"
 
-# Danh sách từ khóa giải đấu cần lọc khỏi tên đội bóng
+# Danh sách từ khóa giải đấu/trạng thái cần loại bỏ khi lấy tên đội bóng
 LEAGUE_KEYWORDS = [
     'league', 'cup', 'championship', 'world cup', 'v-league', 'v league',
     'premier', 'la liga', 'serie a', 'bundesliga', 'ligue', 'cúp', 'giải',
@@ -46,14 +46,14 @@ def is_league_or_status(text):
 def parse_match_card(text, raw_logo):
     lines = [l.strip() for l in text.split('\n') if l.strip()]
 
-    # Trích xuất thời gian
+    # 1. Trích xuất thời gian
     time_match = re.search(r'(\d{1,2}:\d{2})', text)
     date_match = re.search(r'(\d{1,2}/\d{1,2})', text)
     m_time = time_match.group(1) if time_match else ("LIVE" if "LIVE" in text.upper() or "TRỰC TIẾP" in text.upper() else "")
     m_date = date_match.group(1) if date_match else ""
     time_str = f"{m_time} {m_date}".strip() or "LIVE"
 
-    # Trích xuất tên BLV
+    # 2. Trích xuất tên BLV
     blv_str = ""
     blv_match = re.search(r'(?:BLV|Chuối)\s+([A-Za-zÀ-ỹ0-9\s]+)', text, re.IGNORECASE) or re.search(r'\(([^)]+)\)', text)
     if blv_match:
@@ -61,7 +61,7 @@ def parse_match_card(text, raw_logo):
         if any(k in blv_name.lower() for k in ['chuối', 'blv']):
             blv_str = f" ({blv_name})"
 
-    # Phân tích tên hai đội bóng
+    # 3. Trích xuất tên Đội Nhà vs Đội Khách
     teams_str = ""
     vs_idx = -1
     for idx, line in enumerate(lines):
@@ -147,7 +147,7 @@ def run_scraper():
         page = context.new_page()
 
         try:
-            print(f"[*] Đang tải Chuối Chiên TV: {BASE_URL}")
+            print(f"[*] Đang tải trang chủ mới: {BASE_URL}")
             page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
             page.wait_for_timeout(4000)
 
@@ -200,16 +200,16 @@ def run_scraper():
             match_list = list(unique_matches.values())
             page.close()
 
-            print(f"[*] Tìm thấy {len(match_list)} trận từ Chuối Chiên TV. Đang bóc tách link M3U8...")
+            print(f"[*] Đã quét được {len(match_list)} trận từ {BASE_URL}. Bắt đầu tìm link m3u8...")
             for idx, match in enumerate(match_list):
-                print(f"[{idx+1}/{len(match_list)}] Lấy link: {match['title']}")
+                print(f"[{idx+1}/{len(match_list)}] Lấy stream: {match['title']}")
                 m3u8_url = get_m3u8_for_match(context, match['url'])
                 match['m3u8_url'] = m3u8_url
 
             final_matches = match_list
 
         except Exception as e:
-            print(f"[!] Lỗi khi cào dữ liệu Chuối Chiên TV: {e}")
+            print(f"[!] Lỗi khi cào dữ liệu từ {BASE_URL}: {e}")
             page.close()
 
         browser.close()
@@ -220,7 +220,7 @@ def run_scraper():
 
         for item in final_matches:
             logo_attr = f'tvg-logo="{item["logo"]}"' if item["logo"] else ''
-            ref_url = "https://chuoichientv.com"
+            ref_url = "https://chuoichientv1.link"
 
             if item.get('m3u8_url'):
                 encoded_m3u8 = quote(item['m3u8_url'], safe='')
@@ -232,7 +232,7 @@ def run_scraper():
             f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{item["title"]}\n')
             f.write(f'{stream_url}\n\n')
 
-    print(f"[*] Hoàn tất xuất file {OUTPUT_FILE}")
+    print(f"[*] Hoàn tất! Đã xuất file {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     run_scraper()
