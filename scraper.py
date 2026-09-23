@@ -23,7 +23,6 @@ def clean_str(t):
     return re.sub(r'\s+', ' ', t or '').strip()
 
 def parse_teams(text, url):
-    """Trích xuất tên 2 đội thi đấu (Ưu tiên đọc từ URL slug nếu văn bản bị lỗi)"""
     try:
         slug = url.split('?')[0].rstrip('/').split('/')[-1]
         slug = re.sub(r'-\d+$', '', slug)
@@ -72,14 +71,13 @@ def run_scraper():
         raw_items = []
         for domain in DOMAINS:
             try:
-                print(f"[*] Đang thử kết nối: {domain}")
+                print(f"[*] Đang kết nối trang chủ: {domain}")
                 page.goto(domain, timeout=30000, wait_until="domcontentloaded")
                 page.wait_for_timeout(3000)
 
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
                 page.wait_for_timeout(1000)
 
-                # Thu thập link trận đấu & khóa ranh giới thẻ ảnh để không bị tràn cờ Trung Quốc
                 raw_items = page.evaluate('''() => {
                     const items = [];
                     const links = Array.from(document.querySelectorAll('a[href]'));
@@ -101,20 +99,16 @@ def run_scraper():
                                         href.includes('bong-da');
                         if (!isMatch) return;
 
-                        // KHÓA RANH GIỚI: Tìm thẻ cha gần nhất KHÔNG chứa liên kết của trận khác
                         let card = a;
                         let curr = a.parentElement;
                         while (curr && curr.tagName !== 'BODY') {
                             const otherMatchLinks = curr.querySelectorAll('a[href*="/truc-tiep"], a[href*="/match"], a[href*="/live"], a[href*="-vs-"]');
-                            if (otherMatchLinks.length > 1) {
-                                break; // Dừng lại ngay trước khi đụng thẻ cha chung!
-                            }
+                            if (otherMatchLinks.length > 1) break;
                             card = curr;
                             curr = curr.parentElement;
                         }
 
                         let logo = '';
-                        // Chỉ lấy ảnh nằm TRONG KHUNG CÔ LẬP NÀY
                         const imgs = Array.from(card.querySelectorAll('img'));
                         for (let img of imgs) {
                             let src = img.getAttribute('data-src') || img.getAttribute('data-original') || img.getAttribute('src') || '';
@@ -136,48 +130,66 @@ def run_scraper():
 
                 if len(raw_items) > 0:
                     active_domain = domain
-                    print(f"[+] Lấy thành công {len(raw_items)} liên kết tại {domain}")
+                    print(f"[+] Lấy thành công {len(raw_items)} trận đấu tại {domain}")
                     break
             except Exception as e:
                 print(f"[-] Không thể kết nối {domain}: {e}")
 
+        # TRÍCH XUẤT LINK TRÌNH PHÁT VIDEO THỰC TẾ (IFRAME PLAYER)
+        for item in raw_items:
+            url = item['url']
+            text = item['text']
+
+            if url in seen_urls:
+                continue
+
+            # Bóc tách tên BLV
+            blv_name = ""
+            for pat in BLV_PATTERNS:
+                m_blv = re.search(pat, text, re.IGNORECASE)
+                if m_blv:
+                    blv_name = clean_str(m_blv.group(0))
+                    break
+
+            # Bóc tách Giờ
+            time_match = re.search(r'(\d{1,2}:\d{2})', text)
+            m_time = time_match.group(1) if time_match else "LIVE"
+
+            # Bóc tách Tên 2 đội
+            teams_str = parse_teams(text, url)
+            if not teams_str:
+                continue
+
+            # Bấm vào trang chi tiết trận đấu để lấy link luồng video iframe player
+            stream_url = url
+            try:
+                print(f"[*] Bóc tách luồng video: {teams_str}")
+                page.goto(url, timeout=15000, wait_until="domcontentloaded")
+                page.wait_for_timeout(1500)
+
+                iframe_src = page.evaluate('''() => {
+                    const iframe = document.querySelector('iframe[src*="embed"], iframe[src*="player"], iframe[src*="stream"], iframe[src*="live"], iframe');
+                    return iframe ? iframe.getAttribute('src') : '';
+                }''')
+
+                if iframe_src:
+                    stream_url = iframe_src if iframe_src.startsWith('http') else active_domain.rstrip('/') + '/' + iframe_src.lstrip('/')
+            except Exception as err:
+                print(f"[-] Dùng link trang chính cho {teams_str}: {err}")
+
+            blv_suffix = f" ({blv_name})" if blv_name else ""
+            title = f"{m_time} {today_str} ⚽ {teams_str}{blv_suffix} [hls]"
+
+            seen_urls.add(url)
+            parsed_matches.append({
+                "title": title,
+                "logo": item['logo'],
+                "url": stream_url
+            })
+
         browser.close()
 
-    for item in raw_items:
-        url = item['url']
-        text = item['text']
-
-        if url in seen_urls:
-            continue
-
-        # 1. Trích xuất tên BLV
-        blv_name = ""
-        for pat in BLV_PATTERNS:
-            m_blv = re.search(pat, text, re.IGNORECASE)
-            if m_blv:
-                blv_name = clean_str(m_blv.group(0))
-                break
-
-        # 2. Trích xuất Giờ thi đấu
-        time_match = re.search(r'(\d{1,2}:\d{2})', text)
-        m_time = time_match.group(1) if time_match else "LIVE"
-
-        # 3. Trích xuất Cặp trận đấu
-        teams_str = parse_teams(text, url)
-        if not teams_str:
-            continue
-
-        blv_suffix = f" ({blv_name})" if blv_name else ""
-        title = f"{m_time} {today_str} ⚽ {teams_str}{blv_suffix} [hls]"
-
-        seen_urls.add(url)
-        parsed_matches.append({
-            "title": title,
-            "logo": item['logo'],
-            "url": url
-        })
-
-    print(f"[*] Tổng số trận đấu lấy thành công: {len(parsed_matches)}")
+    print(f"[*] Tổng số luồng phát đã hoàn tất: {len(parsed_matches)}")
 
     # Ghi file playlist.m3u
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
