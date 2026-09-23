@@ -72,8 +72,8 @@ def run_scraper():
         for domain in DOMAINS:
             try:
                 print(f"[*] Kết nối trang chủ: {domain}")
-                page.goto(domain, timeout=30000, wait_until="domcontentloaded")
-                page.wait_for_timeout(3000)
+                page.goto(domain, timeout=25000, wait_until="domcontentloaded")
+                page.wait_for_timeout(2500)
 
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
                 page.wait_for_timeout(1000)
@@ -135,7 +135,7 @@ def run_scraper():
             except Exception as e:
                 print(f"[-] Không thể kết nối {domain}: {e}")
 
-        # BẮT BẮT GÓI TIN MẠNG (NETWORK INTERCEPTION) ĐỂ LẤY FILE .M3U8 THỰC TẾ
+        # Xử lý nhanh danh sách, đảm bảo tuyệt đối KHÔNG bao giờ bị treo script
         for item in raw_items:
             match_page_url = item['url']
             text = item['text']
@@ -157,28 +157,20 @@ def run_scraper():
             if not teams_str:
                 continue
 
-            # Mở trang trận đấu & rình bắt link .m3u8 trong luồng mạng
-            captured_m3u8 = ""
-            def handle_response(response):
-                nonlocal captured_m3u8
-                res_url = response.url
-                if ".m3u8" in res_url and "index" in res_url or "playlist" in res_url or "live" in res_url:
-                    captured_m3u8 = res_url
-
-            match_page = context.new_page()
-            match_page.on("response", handle_response)
-
+            # Bóc tách iframe player siêu nhanh (Timeout 4s, nếu quá thời gian giữ ngay link gốc)
+            final_stream_url = match_page_url
             try:
-                print(f"[*] Đang quét tìm file .m3u8 cho: {teams_str}")
-                match_page.goto(match_page_url, timeout=12000, wait_until="domcontentloaded")
-                match_page.wait_for_timeout(3000)
-            except Exception as err:
-                print(f"[-] Lỗi nạp trang: {err}")
-            finally:
-                match_page.close()
-
-            # Nếu bắt được link .m3u8 thì dùng link đó, nếu không thì dùng link gốc làm dự phòng
-            final_stream_url = captured_m3u8 if captured_m3u8 else match_page_url
+                sub_page = context.new_page()
+                sub_page.goto(match_page_url, timeout=4000, wait_until="domcontentloaded")
+                iframe_src = sub_page.evaluate('''() => {
+                    const iframe = document.querySelector('iframe[src*="player"], iframe[src*="embed"], iframe[src*="stream"], iframe');
+                    return iframe ? iframe.getAttribute('src') : '';
+                }''')
+                if iframe_src:
+                    final_stream_url = iframe_src if iframe_src.startsWith('http') else active_domain.rstrip('/') + '/' + iframe_src.lstrip('/')
+                sub_page.close()
+            except Exception:
+                pass
 
             blv_suffix = f" ({blv_name})" if blv_name else ""
             title = f"{m_time} {today_str} ⚽ {teams_str}{blv_suffix} [hls]"
