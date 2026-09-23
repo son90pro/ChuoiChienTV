@@ -79,12 +79,11 @@ def run_scraper():
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
                 page.wait_for_timeout(1000)
 
-                # Thu thập link trận đấu & lọc bỏ logo mặt trời OCA / logo giải đấu
+                # Thu thập link trận đấu & khóa ranh giới thẻ ảnh để không bị tràn cờ Trung Quốc
                 raw_items = page.evaluate('''() => {
                     const items = [];
                     const links = Array.from(document.querySelectorAll('a[href]'));
 
-                    // Từ khóa ảnh KHÔNG PHẢI logo đội bóng (Logo mặt trời Asiad, logo trang, banner...)
                     const BAD_IMG_KEYWORDS = [
                         'sun', 'oca', 'asiad', 'asian', 'banner', 'favicon', 'avatar', 
                         'logo-site', 'default', 'thumb', 'league', 'event', 'icon', 
@@ -102,30 +101,27 @@ def run_scraper():
                                         href.includes('bong-da');
                         if (!isMatch) return;
 
-                        const card = a.closest('.match-item, .card-match, .item-match, .item, .card, div') || a;
+                        // KHÓA RANH GIỚI: Tìm thẻ cha gần nhất KHÔNG chứa liên kết của trận khác
+                        let card = a;
+                        let curr = a.parentElement;
+                        while (curr && curr.tagName !== 'BODY') {
+                            const otherMatchLinks = curr.querySelectorAll('a[href*="/truc-tiep"], a[href*="/match"], a[href*="/live"], a[href*="-vs-"]');
+                            if (otherMatchLinks.length > 1) {
+                                break; // Dừng lại ngay trước khi đụng thẻ cha chung!
+                            }
+                            card = curr;
+                            curr = curr.parentElement;
+                        }
 
                         let logo = '';
-                        // Ưu tiên 1: Lấy ảnh trong các thẻ chứa cờ / logo đội bóng
-                        const teamImgs = Array.from(card.querySelectorAll('[class*="team"] img, [class*="club"] img, [class*="flag"] img, .logo-team img, .team-logo img'));
-                        for (let img of teamImgs) {
+                        // Chỉ lấy ảnh nằm TRONG KHUNG CÔ LẬP NÀY
+                        const imgs = Array.from(card.querySelectorAll('img'));
+                        for (let img of imgs) {
                             let src = img.getAttribute('data-src') || img.getAttribute('data-original') || img.getAttribute('src') || '';
                             let srcLower = src.toLowerCase();
                             if (src && !BAD_IMG_KEYWORDS.some(kw => srcLower.includes(kw))) {
                                 logo = src.startsWith('http') ? src : window.location.origin + src;
                                 break;
-                            }
-                        }
-
-                        // Ưu tiên 2: Quét toàn bộ img nhưng lọc khắt khe
-                        if (!logo) {
-                            const allImgs = Array.from(card.querySelectorAll('img'));
-                            for (let img of allImgs) {
-                                let src = img.getAttribute('data-src') || img.getAttribute('data-original') || img.getAttribute('src') || '';
-                                let srcLower = src.toLowerCase();
-                                if (src && !BAD_IMG_KEYWORDS.some(kw => srcLower.includes(kw))) {
-                                    logo = src.startsWith('http') ? src : window.location.origin + src;
-                                    break;
-                                }
                             }
                         }
 
