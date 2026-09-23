@@ -1,6 +1,6 @@
 #EXTM3U
 
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/uploads/20250623_134337_d547f1b2.png" group-title="Chuối Chiến TV",12:30 23/09 ⚽ Chuối Tây vs Chuối Nhỏ (Chuối Tây Asian) [hls]
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/uploads/20250623_134337_d547f1b2.png" group-title="Chuối Chiến TV",12:30 23/09 ⚽ Gamba Osaka vs Tokushima Vortis (Chuối Tây) [hls]
 #EXTVLCOPT:http-referrer=https://chuoichientv.com/
 #EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
 https://live07.chuoichientv.me/live/1639462/china-pr-u23-vs-uae-u23|Referer=https://chuoichientv.com/&User-Agent=Mozilla/5.0
@@ -15,7 +15,7 @@ https://live07.chuoichientv.me/live/1635582/gamba-osaka-vs-tokushima-vortis|Refe
 #EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
 https://live07.chuoichientv.me/live/1636726/kladno-vs-bank-ostrava|Referer=https://chuoichientv.com/&User-Agent=Mozilla/5.0
 
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/uploads/20250623_125457_13158a72.png" group-title="Chuối Chiến TV",21:00 23/09 ⚽ Vô địch Châu Âu Bóng Chuyền vs Italy (Chuối Kem) [hls]
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/uploads/20250623_125457_13158a72.png" group-title="Chuối Chiến TV",21:00 23/09 ⚽ Italy vs Finland (Chuối Kem) [hls]
 #EXTVLCOPT:http-referrer=https://chuoichientv.com/
 #EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
 https://live07.chuoichientv.me/live/998734/italy-vs-finland|Referer=https://chuoichientv.com/&User-Agent=Mozilla/5.0
