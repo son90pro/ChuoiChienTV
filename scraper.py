@@ -71,7 +71,7 @@ def run_scraper():
         raw_items = []
         for domain in DOMAINS:
             try:
-                print(f"[*] Đang kết nối trang chủ: {domain}")
+                print(f"[*] Kết nối trang chủ: {domain}")
                 page.goto(domain, timeout=30000, wait_until="domcontentloaded")
                 page.wait_for_timeout(3000)
 
@@ -130,20 +130,19 @@ def run_scraper():
 
                 if len(raw_items) > 0:
                     active_domain = domain
-                    print(f"[+] Lấy thành công {len(raw_items)} trận đấu tại {domain}")
+                    print(f"[+] Tìm thấy {len(raw_items)} trận đấu tại {domain}")
                     break
             except Exception as e:
                 print(f"[-] Không thể kết nối {domain}: {e}")
 
-        # TRÍCH XUẤT LINK TRÌNH PHÁT VIDEO THỰC TẾ (IFRAME PLAYER)
+        # BẮT BẮT GÓI TIN MẠNG (NETWORK INTERCEPTION) ĐỂ LẤY FILE .M3U8 THỰC TẾ
         for item in raw_items:
-            url = item['url']
+            match_page_url = item['url']
             text = item['text']
 
-            if url in seen_urls:
+            if match_page_url in seen_urls:
                 continue
 
-            # Bóc tách tên BLV
             blv_name = ""
             for pat in BLV_PATTERNS:
                 m_blv = re.search(pat, text, re.IGNORECASE)
@@ -151,45 +150,49 @@ def run_scraper():
                     blv_name = clean_str(m_blv.group(0))
                     break
 
-            # Bóc tách Giờ
             time_match = re.search(r'(\d{1,2}:\d{2})', text)
             m_time = time_match.group(1) if time_match else "LIVE"
 
-            # Bóc tách Tên 2 đội
-            teams_str = parse_teams(text, url)
+            teams_str = parse_teams(text, match_page_url)
             if not teams_str:
                 continue
 
-            # Bấm vào trang chi tiết trận đấu để lấy link luồng video iframe player
-            stream_url = url
+            # Mở trang trận đấu & rình bắt link .m3u8 trong luồng mạng
+            captured_m3u8 = ""
+            def handle_response(response):
+                nonlocal captured_m3u8
+                res_url = response.url
+                if ".m3u8" in res_url and "index" in res_url or "playlist" in res_url or "live" in res_url:
+                    captured_m3u8 = res_url
+
+            match_page = context.new_page()
+            match_page.on("response", handle_response)
+
             try:
-                print(f"[*] Bóc tách luồng video: {teams_str}")
-                page.goto(url, timeout=15000, wait_until="domcontentloaded")
-                page.wait_for_timeout(1500)
-
-                iframe_src = page.evaluate('''() => {
-                    const iframe = document.querySelector('iframe[src*="embed"], iframe[src*="player"], iframe[src*="stream"], iframe[src*="live"], iframe');
-                    return iframe ? iframe.getAttribute('src') : '';
-                }''')
-
-                if iframe_src:
-                    stream_url = iframe_src if iframe_src.startsWith('http') else active_domain.rstrip('/') + '/' + iframe_src.lstrip('/')
+                print(f"[*] Đang quét tìm file .m3u8 cho: {teams_str}")
+                match_page.goto(match_page_url, timeout=12000, wait_until="domcontentloaded")
+                match_page.wait_for_timeout(3000)
             except Exception as err:
-                print(f"[-] Dùng link trang chính cho {teams_str}: {err}")
+                print(f"[-] Lỗi nạp trang: {err}")
+            finally:
+                match_page.close()
+
+            # Nếu bắt được link .m3u8 thì dùng link đó, nếu không thì dùng link gốc làm dự phòng
+            final_stream_url = captured_m3u8 if captured_m3u8 else match_page_url
 
             blv_suffix = f" ({blv_name})" if blv_name else ""
             title = f"{m_time} {today_str} ⚽ {teams_str}{blv_suffix} [hls]"
 
-            seen_urls.add(url)
+            seen_urls.add(match_page_url)
             parsed_matches.append({
                 "title": title,
                 "logo": item['logo'],
-                "url": stream_url
+                "url": final_stream_url
             })
 
         browser.close()
 
-    print(f"[*] Tổng số luồng phát đã hoàn tất: {len(parsed_matches)}")
+    print(f"[*] Tổng số trận bóc tách hoàn tất: {len(parsed_matches)}")
 
     # Ghi file playlist.m3u
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
@@ -203,7 +206,7 @@ def run_scraper():
                 f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{m["title"]}\n')
                 f.write(f'#EXTVLCOPT:http-referrer={active_domain}/\n')
                 f.write(f'#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)\n')
-                f.write(f'{m["url"]}|Referer={active_domain}/&User-Agent=Mozilla/5.0\n\n')
+                f.write(f'{m["url"]}|Referer={active_domain}/&User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)\n\n')
 
 if __name__ == "__main__":
     run_scraper()
