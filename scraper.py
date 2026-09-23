@@ -13,13 +13,12 @@ DOMAINS = [
 OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Chuối Chiến TV"
 
-# Từ khóa loại bỏ tên giải đấu/hệ thống
-INVALID_TEAM_KEYWORDS = [
-    "bóng chuyền", "bóng rổ", "bóng đá", "vô địch", "châu âu", "châu á", 
-    "world cup", "asian games", "emperor's cup", "emperor", "jfa", "championship",
-    "v-league", "premier league", "champions league", "euro", "copa", "afc", "fifa",
-    "uefa", "serie", "liga", "bundesliga", "u20", "u23", "u19", "u17", "women", "nữ",
-    "cúp", "cup", "giải", "bảng", "vòng", "trực tiếp", "live", "hls", "flv", "xem ngay"
+# CHỈ lọc bỏ các từ rác / quảng cáo (KHÔNG chặn U23, U20, Cup, Nữ...)
+SPAM_KEYWORDS = [
+    "giúp bạn", "toàn diện", "thế giới", "bản quyền", "hệ thống", 
+    "trải nghiệm", "chất lượng", "miễn phí", "liên hệ", "đăng ký", 
+    "khuyến mãi", "chuoichien", "bonglau", "soi kèo", "đặt cược", 
+    "cam kết", "tải trang", "uy lực", "phát sóng"
 ]
 
 BLV_PATTERNS = [
@@ -31,32 +30,16 @@ BLV_PATTERNS = [
 def clean_str(t):
     return re.sub(r'\s+', ' ', t or '').strip()
 
-def is_invalid_team(name):
-    n_lower = name.lower().strip()
-    if len(n_lower) < 2 or "chuối" in n_lower or "blv" in n_lower:
+def is_spam(text):
+    t_lower = text.lower().strip()
+    if len(t_lower) < 2 or "chuối" in t_lower or "blv" in t_lower:
         return True
-    if any(kw in n_lower for kw in INVALID_TEAM_KEYWORDS):
-        return True
-    return False
-
-def extract_teams_from_url(url):
-    """Trích xuất tên 2 đội từ URL slug (Cơ chế dự phòng chuẩn 100%)"""
-    try:
-        slug = url.split('/')[-1].split('?')[0]
-        slug = re.sub(r'-\d+$', '', slug) # Bỏ ID cuối URL
-        if '-vs-' in slug:
-            parts = slug.split('-vs-')
-            t1 = parts[0].replace('-', ' ').title()
-            t2 = parts[1].replace('-', ' ').title()
-            return f"{t1} vs {t2}"
-    except:
-        pass
-    return ""
+    return any(kw in t_lower for kw in SPAM_KEYWORDS)
 
 def run_scraper():
     today_str = datetime.now().strftime("%d/%m")
     parsed_matches = []
-    seen_keys = set()
+    seen_urls = set()
     active_domain = DOMAINS[0]
 
     with sync_playwright() as p:
@@ -79,12 +62,11 @@ def run_scraper():
                 page.goto(domain, timeout=30000, wait_until="domcontentloaded")
                 page.wait_for_timeout(4000)
 
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
-                page.wait_for_timeout(1000)
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                page.wait_for_timeout(1500)
+                # Cuộn trang nhiều lần để tải hết danh sách trận (Lazy load)
+                for _ in range(3):
+                    page.evaluate("window.scrollBy(0, 1000)")
+                    page.wait_for_timeout(800)
 
-                # Thu hẹp scope chính xác từng thẻ trận đấu (Tránh dính thẻ bên cạnh)
                 raw_items = page.evaluate('''() => {
                     const results = [];
                     const links = Array.from(document.querySelectorAll('a[href*="/truc-tiep"], a[href*="/match"], a[href*="/live"], a[href*="-vs-"]'));
@@ -93,27 +75,18 @@ def run_scraper():
                         const href = link.getAttribute('href');
                         if (!href) return;
 
-                        // Tìm container nhỏ nhất bao quanh duy nhất 1 thẻ này
-                        let card = link.closest('.match-item, .card-match, .item-match, .item, .card') || link;
+                        let card = link.closest('.match-item, .card-match, .item-match, .item, .card, div[class*="match"]') || link;
 
                         let logo = '';
-                        const teamImgs = Array.from(card.querySelectorAll('[class*="team"] img, [class*="club"] img, [class*="flag"] img, .logo-team img'));
-                        if (teamImgs.length > 0) {
-                            let src = teamImgs[0].getAttribute('src') || teamImgs[0].getAttribute('data-src') || '';
-                            if (src) logo = src.startsWith('http') ? src : window.location.origin + src;
-                        }
-
-                        if (!logo) {
-                            const allImgs = Array.from(card.querySelectorAll('img'));
-                            for (let img of allImgs) {
-                                let src = img.getAttribute('src') || img.getAttribute('data-src') || '';
-                                let srcLower = src.toLowerCase();
-                                if (src && !srcLower.includes('avatar') && !srcLower.includes('favicon') && 
-                                    !srcLower.includes('banner') && !srcLower.includes('logo-site') && 
-                                    !srcLower.includes('sun') && !srcLower.includes('icon-default')) {
-                                    logo = src.startsWith('http') ? src : window.location.origin + src;
-                                    break;
-                                }
+                        const teamImgs = Array.from(card.querySelectorAll('[class*="team"] img, [class*="club"] img, [class*="flag"] img, .logo-team img, img'));
+                        for (let img of teamImgs) {
+                            let src = img.getAttribute('src') || img.getAttribute('data-src') || '';
+                            let srcLower = src.toLowerCase();
+                            if (src && !srcLower.includes('avatar') && !srcLower.includes('favicon') && 
+                                !srcLower.includes('banner') && !srcLower.includes('logo-site') && 
+                                !srcLower.includes('sun') && !srcLower.includes('icon-default')) {
+                                logo = src.startsWith('http') ? src : window.location.origin + src;
+                                break;
                             }
                         }
 
@@ -136,9 +109,10 @@ def run_scraper():
         browser.close()
 
     for item in raw_items:
-        text = item['text']
         url = item['url']
-        if not text or len(text.strip()) < 3:
+        text = item['text']
+
+        if url in seen_urls:
             continue
 
         # 1. Trích xuất tên BLV
@@ -149,12 +123,10 @@ def run_scraper():
                 blv_name = clean_str(m_blv.group(0))
                 break
 
-        # 2. Xóa tên BLV khỏi văn bản
+        # 2. Xóa BLV khỏi văn bản
         text_clean = text
         if blv_name:
             text_clean = re.sub(re.escape(blv_name), '', text_clean, flags=re.IGNORECASE)
-        for pat in BLV_PATTERNS:
-            text_clean = re.sub(pat, '', text_clean, flags=re.IGNORECASE)
 
         # 3. Trích xuất giờ
         time_match = re.search(r'(\d{1,2}:\d{2})', text)
@@ -169,34 +141,35 @@ def run_scraper():
         if vs_match:
             t1 = clean_str(vs_match.group(1).split('\n')[-1])
             t2 = clean_str(vs_match.group(2).split('\n')[0])
-
-            for kw in INVALID_TEAM_KEYWORDS:
-                t1 = re.sub(r'(?i)^' + re.escape(kw) + r'\s*[-:\.]*\s*', '', t1).strip()
-                t1 = re.sub(r'(?i)\s*[-:\.]*\s*' + re.escape(kw) + r'$', '', t1).strip()
-                t2 = re.sub(r'(?i)^' + re.escape(kw) + r'\s*[-:\.]*\s*', '', t2).strip()
-                t2 = re.sub(r'(?i)\s*[-:\.]*\s*' + re.escape(kw) + r'$', '', t2).strip()
-
-            if not is_invalid_team(t1) and not is_invalid_team(t2):
+            if not is_spam(t1) and not is_spam(t2) and len(t1) >= 2 and len(t2) >= 2:
                 teams_str = f"{t1} vs {t2}"
 
-        # Nếu văn bản bị dính lỗi, lấy tên đội trực tiếp từ URL slug
-        if not teams_str:
-            teams_str = extract_teams_from_url(url)
+        # Nếu không tìm thấy cặp vs bằng chữ, lấy tên 2 đội trực tiếp từ link URL slug
+        if not teams_str and '-vs-' in url:
+            try:
+                slug = url.split('/')[-1].split('?')[0]
+                slug = re.sub(r'-\d+$', '', slug)
+                parts = slug.split('-vs-')
+                t1 = parts[0].replace('-', ' ').title()
+                t2 = parts[1].replace('-', ' ').title()
+                teams_str = f"{t1} vs {t2}"
+            except:
+                pass
 
-        if not teams_str or is_invalid_team(teams_str):
+        if not teams_str:
             continue
 
         blv_suffix = f" ({blv_name})" if blv_name else ""
         title = f"{m_time} {today_str} ⚽ {teams_str}{blv_suffix} [hls]"
 
-        key = f"{item['url']}_{title}"
-        if key not in seen_keys:
-            seen_keys.add(key)
-            parsed_matches.append({
-                "title": title,
-                "logo": item['logo'],
-                "url": item['url']
-            })
+        seen_urls.add(url)
+        parsed_matches.append({
+            "title": title,
+            "logo": item['logo'],
+            "url": url
+        })
+
+    print(f"[*] Tổng số trận thu thập được: {len(parsed_matches)}")
 
     # Ghi file playlist.m3u
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
