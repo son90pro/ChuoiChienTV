@@ -1,97 +1,163 @@
 import re
-import json
-import requests
-from bs4 import BeautifulSoup
+import time
 from datetime import datetime
+from playwright.sync_api import sync_playwright
 
-# Domain Chuối Chiến TV (hoặc đổi thành nguồn tương ứng)
-BASE_URL = "https://chuoichientv1.link"
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-    "Referer": BASE_URL
-}
+URLS_TO_TRY = [
+    "https://chuoichientv1.link",
+    "https://chuoichientv.link",
+    "https://chuoichientv1.com"
+]
+OUTPUT_FILE = "playlist.m3u"
+GROUP_NAME = "Chuối Chiến TV"
 
-def get_chuoi_chien_matches():
+FILTER_KEYWORDS = [
+    "cup", "cúp", "league", "championship", "asian games", "v-league", 
+    "premier", "champions", "euro", "copa", "afc", "fifa", "uefa", 
+    "serie", "liga", "bundesliga", "live", "trực tiếp", "hls", "flv"
+]
+
+def run_scraper():
     matches = []
-    # Lấy ngày hiện tại dạng DD/MM (ví dụ: 23/09)
     today_str = datetime.now().strftime("%d/%m")
-    
+    base_used = URLS_TO_TRY[0]
+
     try:
-        res = requests.get(BASE_URL, headers=HEADERS, timeout=10)
-        res.encoding = 'utf-8'
-        soup = BeautifulSoup(res.text, 'html.parser')
-        
-        # Lấy danh sách khung/card trận đấu trên web
-        cards = soup.select('.match-item, .card-match, .item-match, div[class*="match"]')
-        
-        for card in cards:
-            # 1. Bóc tách thời gian (Giờ:Phút)
-            time_el = card.select_one('.time, .match-time, span[class*="time"]')
-            time_str = time_el.get_text(strip=True) if time_el else "15:00"
-            
-            # 2. Bóc tách tên 2 đội
-            team_els = card.select('.team-name, .name, .team, span[class*="team"]')
-            if len(team_els) >= 2:
-                team1 = team_els[0].get_text(strip=True)
-                team2 = team_els[1].get_text(strip=True)
-            else:
-                full_text = card.get_text()
-                match_vs = re.search(r'(.+?)\s+vs\s+(.+)', full_text, re.IGNORECASE)
-                if match_vs:
-                    team1, team2 = match_vs.group(1).strip(), match_vs.group(2).strip()
-                else:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=True,
+                args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
+            )
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+                viewport={"width": 1280, "height": 720}
+            )
+            page = context.new_page()
+
+            raw_items = []
+            for target_url in URLS_TO_TRY:
+                try:
+                    print(f"[*] Kết nối: {target_url}")
+                    page.goto(target_url, timeout=30000, wait_until="domcontentloaded")
+                    page.wait_for_timeout(4000)
+                    
+                    # Cuộn trang để tải full danh sách
+                    page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
+                    page.wait_for_timeout(1500)
+                    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    page.wait_for_timeout(1500)
+
+                    raw_items = page.evaluate('''() => {
+                        const results = [];
+                        const links = Array.from(document.querySelectorAll('a'));
+                        links.forEach(a => {
+                            const href = a.getAttribute('href') || '';
+                            if (!href) return;
+
+                            const isMatch = href.includes('/truc-tiep') || 
+                                            href.includes('/match') || 
+                                            href.includes('/live') || 
+                                            href.includes('bong-da') || 
+                                            href.includes('-vs-');
+                            if (!isMatch) return;
+
+                            const card = a.closest('.match-item, .item-match, .card-match, .match-card, div') || a;
+                            
+                            let logo = '';
+                            const imgs = Array.from(card.querySelectorAll('img'));
+                            for (let img of imgs) {
+                                let src = img.getAttribute('src') || img.getAttribute('data-src') || '';
+                                if (src && !src.includes('avatar') && !src.includes('favicon') && !src.includes('banner')) {
+                                    logo = src.startsWith('http') ? src : window.location.origin + src;
+                                    break;
+                                }
+                            }
+
+                            results.push({
+                                url: href.startsWith('http') ? href : window.location.origin + href,
+                                text: card.innerText || a.innerText || '',
+                                logo: logo
+                            });
+                        });
+                        return results;
+                    }''')
+
+                    if raw_items:
+                        base_used = target_url
+                        print(f"[+] Tìm thấy {len(raw_items)} trận đấu.")
+                        break
+                except Exception as e:
+                    print(f"[-] Lỗi truy cập {target_url}: {e}")
+
+            # Xử lý & định dạng từng trận
+            unique_keys = set()
+            for item in raw_items:
+                text = item['text']
+                if not text or len(text.strip()) < 3:
                     continue
-            
-            # 3. Bóc tách tên BLV (Bình luận viên)
-            blv_el = card.select_one('.blv, .commentator, span[class*="blv"]')
-            blv_name = blv_el.get_text(strip=True) if blv_el else "Chuối Chiến"
-            blv_name = re.sub(r'^(BLV|Bình luận viên)\s*', '', blv_name, flags=re.IGNORECASE)
-            
-            # 4. Bóc tách Logo / Hình đại diện
-            img_el = card.select_one('img')
-            logo_url = img_el['src'] if (img_el and 'src' in img_el.attrs) else ""
-            if logo_url and not logo_url.startswith('http'):
-                logo_url = BASE_URL.rstrip('/') + '/' + logo_url.lstrip('/')
-                
-            # 5. Link luồng xem (M3U8 / HLS)
-            link_el = card.select_one('a[href]')
-            stream_url = link_el['href'] if link_el else "https://example.com/live.m3u8"
-            
-            # Chuẩn hóa tên tiêu đề kênh HỆT NHƯ TRONG ÁNH MẪU
-            display_title = f"{time_str} {today_str} ⚽ {team1} vs {team2} ({blv_name}) [hls]"
-            
-            matches.append({
-                "title": display_title,
-                "team1": team1,
-                "team2": team2,
-                "time": f"{time_str} {today_str}",
-                "blv": blv_name,
-                "logo": logo_url,
-                "url": stream_url
-            })
-            
-    except Exception as e:
-        print(f"Lỗi kết nối hoặc cào dữ liệu: {e}")
-        
-    return matches
 
-def export_m3u(matches, group_name="Chuối Chiến TV"):
-    """Xuất ra file M3U cho OTT Navigator / Tivimate / Monster TV"""
-    m3u_content = ["#EXTM3U"]
-    for m in matches:
-        m3u_content.append(f'#EXTINF:-1 tvg-logo="{m["logo"]}" group-title="{group_name}",{m["title"]}')
-        m3u_content.append(m["url"])
-    return "\n".join(m3u_content)
+                # Lấy giờ
+                time_match = re.search(r'(\d{1,2}:\d{2})', text)
+                m_time = time_match.group(1) if time_match else "15:00"
 
-# Run Script
+                # Lấy BLV
+                blv_name = ""
+                blv_match = re.search(r'((?:BLV|Chuối|Gà)\s+[A-Za-zÀ-ỹ0-9\s\+]+)', text, re.IGNORECASE)
+                if blv_match:
+                    blv_name = blv_match.group(1).strip()
+                    blv_name = re.split(r'(?:hls|flv|live|trực tiếp|\d{1,2}:\d{2})', blv_name, flags=re.IGNORECASE)[0].strip()
+
+                # Lấy tên 2 đội
+                clean_text = re.sub(r'\d{1,2}:\d{2}', '', text)
+                teams_str = ""
+                vs_match = re.search(r'([A-Za-zÀ-ỹ0-9\s\.\-]+)\s+(?:vs|-)\s+([A-Za-zÀ-ỹ0-9\s\.\-]+)', clean_text, re.IGNORECASE)
+                if vs_match:
+                    t1 = vs_match.group(1).split('\n')[-1].strip()
+                    t2 = vs_match.group(2).split('\n')[0].strip()
+                    if len(t1) >= 2 and len(t2) >= 2:
+                        teams_str = f"{t1} vs {t2}"
+
+                if not teams_str:
+                    lines = [l.strip() for l in clean_text.split('\n') if len(l.strip()) >= 2]
+                    valid = [l for l in lines if not any(kw in l.lower() for kw in FILTER_KEYWORDS)]
+                    if len(valid) >= 2:
+                        teams_str = f"{valid[0]} vs {valid[1]}"
+                    elif len(valid) == 1:
+                        teams_str = valid[0]
+
+                if not teams_str:
+                    continue
+
+                blv_suffix = f" ({blv_name})" if blv_name else ""
+                title_formatted = f"{m_time} {today_str} ⚽ {teams_str}{blv_suffix} [hls]"
+
+                dedup_key = f"{item['url']}_{title_formatted}"
+                if dedup_key not in unique_keys:
+                    unique_keys.add(dedup_key)
+                    matches.append({
+                        "title": title_formatted,
+                        "logo": item['logo'],
+                        "url": item['url']
+                    })
+
+            browser.close()
+    except Exception as ex:
+        print(f"[-] Lỗi chính: {ex}")
+
+    # Ghi file M3U (đảm bảo luôn tạo file kể cả khi lỗi để không bị sập Actions)
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        f.write("#EXTM3U\n\n")
+        if not matches:
+            f.write(f'#EXTINF:-1 tvg-logo="{base_used}/favicon.ico" group-title="{GROUP_NAME}",Chưa có trận đấu nào\n')
+            f.write("http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4\n")
+        else:
+            for m in matches:
+                logo_attr = f'tvg-logo="{m["logo"]}"' if m["logo"] else ''
+                f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{m["title"]}\n')
+                f.write(f'#EXTVLCOPT:http-referrer={base_used}/\n')
+                f.write(f'#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)\n')
+                f.write(f'{m["url"]}|Referer={base_used}/&User-Agent=Mozilla/5.0\n\n')
+
 if __name__ == "__main__":
-    match_list = get_chuoi_chien_matches()
+    run_scraper()
     
-    # In ra Playlist M3U chuẩn
-    m3u_result = export_m3u(match_list, group_name="Chuối Chiến TV")
-    print(m3u_result)
-    
-    # Hoặc lưu ra file
-    with open("chuoi_chien_tv.m3u", "w", encoding="utf-8") as f:
-        f.write(m3u_result)
-        
