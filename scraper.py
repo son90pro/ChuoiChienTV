@@ -3,17 +3,19 @@ import re
 from urllib.parse import quote
 from playwright.sync_api import sync_playwright
 
-# Tên miền Cloudflare Worker của anh Sơn
 WORKER_DOMAIN = "cctv.sonnguyen90pro.workers.dev"
-
-# Tên miền nguồn chuẩn mới của Chuối Chiên TV
 BASE_URL = "https://chuoichientv1.link"
 
 OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Chuối Chiên TV"
 DEFAULT_LOGO = "https://raw.githubusercontent.com/iptv-org/iptv/master/logos/sports.png"
 
-# Danh sách từ khóa giải đấu/trạng thái cần loại bỏ khi lấy tên đội bóng
+# Các từ khóa của banner quảng cáo / giới thiệu cần LOẠI BỎ
+IGNORE_KEYWORDS = [
+    'về chuoichien', 'về chuối chiên', 'trang chủ', 'giới thiệu', 'điều khoản',
+    'chính sách', 'liên hệ', 'quảng cáo', 'tải app', 'bảng xếp hạng', 'lịch thi đấu'
+]
+
 LEAGUE_KEYWORDS = [
     'league', 'cup', 'championship', 'world cup', 'v-league', 'v league',
     'premier', 'la liga', 'serie a', 'bundesliga', 'ligue', 'cúp', 'giải',
@@ -61,7 +63,7 @@ def parse_match_card(text, raw_logo):
         if any(k in blv_name.lower() for k in ['chuối', 'blv']):
             blv_str = f" ({blv_name})"
 
-    # 3. Trích xuất tên Đội Nhà vs Đội Khách
+    # 3. Phân tích tên Đội Nhà vs Đội Khách
     teams_str = ""
     vs_idx = -1
     for idx, line in enumerate(lines):
@@ -147,23 +149,29 @@ def run_scraper():
         page = context.new_page()
 
         try:
-            print(f"[*] Đang tải trang chủ mới: {BASE_URL}")
-            page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
-            page.wait_for_timeout(4000)
+            print(f"[*] Đang tải trang chủ: {BASE_URL}")
+            page.goto(BASE_URL, timeout=40000, wait_until="networkidle")
+            
+            # Cuộn trang xuống để kích hoạt lazy loading hình ảnh và trận đấu
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
+            time.sleep(2)
+            page.evaluate("window.scrollTo(0, 0)")
+            time.sleep(2)
 
             raw_matches = page.evaluate('''() => {
                 const matches = [];
-                const cards = Array.from(document.querySelectorAll('.match-item, .card-match, .item-match, div[class*="match"], div[class*="card"], a[href*="/truc-tiep/"], a[href*="/match/"], a[href*="/xem/"]'));
+                // Bắt tất cả thẻ chứa liên kết trận đấu
+                const allLinks = Array.from(document.querySelectorAll('a[href*="/truc-tiep/"], a[href*="/match/"], a[href*="/xem/"], a[href*="/live/"]'));
 
-                cards.forEach(card => {
-                    const linkEl = card.tagName === 'A' ? card : (card.querySelector('a[href*="/truc-tiep/"], a[href*="/match/"], a[href*="/xem/"]') || card.querySelector('a'));
-                    if (!linkEl) return;
-
-                    const href = linkEl.getAttribute('href');
+                allLinks.forEach(link => {
+                    const href = link.getAttribute('href');
                     if (!href || href === '#' || href.startsWith('javascript')) return;
 
+                    # Lấy thẻ cha chứa toàn bộ thông tin card trận đấu
+                    let parentCard = link.closest('.match-item') || link.closest('.card-match') || link.closest('.item-match') || link.closest('div[class*="match"]') || link;
+
                     let logo = '';
-                    const imgs = Array.from(card.querySelectorAll('img'));
+                    const imgs = Array.from(parentCard.querySelectorAll('img'));
                     for (let img of imgs) {
                         let src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || '';
                         if (src && !src.includes('favicon') && !src.includes('icon-') && !src.includes('bg-')) {
@@ -175,7 +183,7 @@ def run_scraper():
                     matches.push({
                         url: href.startsWith('http') ? href : window.location.origin + href,
                         logo: logo,
-                        fullText: card.innerText || ''
+                        fullText: parentCard.innerText || link.innerText || ''
                     });
                 });
 
@@ -189,6 +197,11 @@ def run_scraper():
                 if not text or url in unique_matches:
                     continue
 
+                # Loại bỏ các ô bài viết quảng cáo / giới thiệu
+                text_lower = text.lower()
+                if any(ignore_kw in text_lower for ignore_kw in IGNORE_KEYWORDS):
+                    continue
+
                 title, logo = parse_match_card(text, item['logo'])
 
                 unique_matches[url] = {
@@ -200,9 +213,9 @@ def run_scraper():
             match_list = list(unique_matches.values())
             page.close()
 
-            print(f"[*] Đã quét được {len(match_list)} trận từ {BASE_URL}. Bắt đầu tìm link m3u8...")
+            print(f"[*] Tìm thấy {len(match_list)} trận đấu từ {BASE_URL}. Bắt đầu bóc tách stream m3u8...")
             for idx, match in enumerate(match_list):
-                print(f"[{idx+1}/{len(match_list)}] Lấy stream: {match['title']}")
+                print(f"[{idx+1}/{len(match_list)}] Lấy link stream: {match['title']}")
                 m3u8_url = get_m3u8_for_match(context, match['url'])
                 match['m3u8_url'] = m3u8_url
 
