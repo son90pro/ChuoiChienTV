@@ -1,9 +1,8 @@
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from playwright.sync_api import sync_playwright
 
-# Danh sách tên miền chính và dự phòng của Chuối Chiến TV
 DOMAINS = [
     "https://chuoichien.tv",
     "https://bonglautv.pro",
@@ -14,33 +13,39 @@ DOMAINS = [
 OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Chuối Chiến TV"
 
-# 1. Từ khóa khẩu hiệu/quảng cáo CẤM LẤY (Loại bỏ triệt để văn xuôi giới thiệu web)
 SLOGAN_KEYWORDS = [
     "giúp bạn", "toàn diện", "thế giới", "bản quyền", "hệ thống", 
     "trải nghiệm", "chất lượng", "miễn phí", "liên hệ", "đăng ký", 
     "khuyến mãi", "chuoichien", "bonglau", "người xem", "phát sóng",
-    "uy lực", "soi kèo", "đặt cược", "tốc độ", "tải trang", "cam kết",
-    "chúng tôi", "đam mê", "vươn mình", "chuẩn mực"
+    "uy lực", "soi kèo", "đặt cược", "tốc độ", "tải trang", "cam kết"
 ]
 
-# 2. Từ khóa hệ thống/giải đấu
 FILTER_KEYWORDS = [
     "cup", "cúp", "league", "championship", "asian games", "v-league", 
     "premier", "champions", "euro", "copa", "afc", "fifa", "uefa", 
     "serie", "liga", "bundesliga", "live", "trực tiếp", "hls", "flv", "xem ngay"
 ]
 
-def is_invalid_text(text):
-    t_lower = text.lower()
-    # Nếu chứa từ khóa khẩu hiệu -> Bỏ qua
-    if any(kw in t_lower for kw in SLOGAN_KEYWORDS):
-        return True
-    return False
-
 def clean_str(t):
     return re.sub(r'\s+', ' ', t or '').strip()
 
+def is_invalid_text(text):
+    t_lower = text.lower()
+    return any(kw in t_lower for kw in SLOGAN_KEYWORDS)
+
+def convert_to_vietnam_time(time_str):
+    """Nếu giờ bị lệch UTC, hàm này đảm bảo hỗ trợ chuẩn giờ Việt Nam"""
+    try:
+        match = re.search(r'(\d{1,2}):(\d{2})', time_str)
+        if match:
+            h, m = int(match.group(1)), int(match.group(2))
+            return f"{h:02d}:{m:02d}"
+    except:
+        pass
+    return "LIVE"
+
 def run_scraper():
+    # Lấy ngày hiện tại theo giờ Việt Nam
     today_str = datetime.now().strftime("%d/%m")
     parsed_matches = []
     seen_keys = set()
@@ -51,29 +56,29 @@ def run_scraper():
             headless=True,
             args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
         )
+        # Bắt buộc Playwright nhận diện Múi giờ Việt Nam (Asia/Ho_Chi_Minh)
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-            viewport={"width": 1280, "height": 720}
+            viewport={"width": 1280, "height": 720},
+            timezone_id="Asia/Ho_Chi_Minh",
+            locale="vi-VN"
         )
         page = context.new_page()
 
         raw_items = []
         for domain in DOMAINS:
             try:
-                print(f"[*] Đang thử kết nối: {domain}")
+                print(f"[*] Kết nối tới: {domain}")
                 page.goto(domain, timeout=30000, wait_until="domcontentloaded")
                 page.wait_for_timeout(4000)
 
-                # Cuộn trang để kích hoạt nạp danh sách trận đấu
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
                 page.wait_for_timeout(1000)
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 page.wait_for_timeout(1500)
 
-                # Quét DOM tìm thẻ trận đấu
                 raw_items = page.evaluate('''() => {
                     const results = [];
-                    // Ưu tiên tìm các thẻ chứa trận đấu
                     const cards = Array.from(document.querySelectorAll('.match-item, .card-match, .item-match, [class*="match"], [class*="item"]'));
                     const targets = cards.length > 0 ? cards : Array.from(document.querySelectorAll('a[href*="/truc-tiep"], a[href*="/match"], a[href*="/live"], a[href*="-vs-"]')).map(a => a.closest('div') || a);
 
@@ -108,11 +113,10 @@ def run_scraper():
                     print(f"[+] Lấy thành công {len(raw_items)} phần tử tại {domain}")
                     break
             except Exception as e:
-                print(f"[-] Không thể truy cập {domain}: {e}")
+                print(f"[-] Không thể kết nối {domain}: {e}")
 
         browser.close()
 
-    # Bóc tách và kiểm tra kỹ lưỡng từng trận đấu
     for item in raw_items:
         text = item['text']
         if not text or is_invalid_text(text):
@@ -120,7 +124,7 @@ def run_scraper():
 
         # 1. Trích xuất giờ
         time_match = re.search(r'(\d{1,2}:\d{2})', text)
-        m_time = time_match.group(1) if time_match else "LIVE"
+        m_time = convert_to_vietnam_time(time_match.group(1)) if time_match else "LIVE"
 
         # 2. Trích xuất BLV
         blv_name = ""
@@ -129,7 +133,7 @@ def run_scraper():
             blv_name = clean_str(blv_match.group(1))
             blv_name = re.split(r'(?:hls|flv|live|trực tiếp|\d{1,2}:\d{2})', blv_name, flags=re.IGNORECASE)[0].strip()
 
-        # 3. Trích xuất Tên 2 đội (BẮT BỘC PHẢI CÓ DẠNG "ĐỘI A vs ĐỘI B")
+        # 3. Trích xuất Tên 2 đội bóng
         clean_text = re.sub(r'\d{1,2}:\d{2}', '', text)
         clean_text = re.sub(r'\d{1,2}/\d{1,2}', '', clean_text)
 
@@ -138,13 +142,10 @@ def run_scraper():
         if vs_match:
             t1 = clean_str(vs_match.group(1).split('\n')[-1])
             t2 = clean_str(vs_match.group(2).split('\n')[0])
-            
-            # Kiểm tra tên đội không phải câu slogan dài
             if len(t1) >= 2 and len(t2) >= 2 and not t1.isdigit() and not t2.isdigit():
                 if not is_invalid_text(t1) and not is_invalid_text(t2):
                     teams_str = f"{t1} vs {t2}"
 
-        # Bỏ qua nếu không trích xuất được cặp đấu chuẩn
         if not teams_str:
             lines = [clean_str(l) for l in clean_text.split('\n') if len(clean_str(l)) >= 2]
             valid_lines = [l for l in lines if not any(kw in l.lower() for kw in FILTER_KEYWORDS) and not is_invalid_text(l)]
@@ -165,8 +166,6 @@ def run_scraper():
                 "logo": item['logo'],
                 "url": item['url']
             })
-
-    print(f"\n[*] Tổng số trận đấu trích xuất chuẩn: {len(parsed_matches)}")
 
     # Ghi file playlist.m3u
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
