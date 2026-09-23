@@ -1,6 +1,6 @@
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from playwright.sync_api import sync_playwright
 
 DOMAINS = [
@@ -13,6 +13,14 @@ DOMAINS = [
 OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Chuối Chiến TV"
 
+# Danh sách từ khóa giải đấu cần lọc sạch khỏi tên đội và BLV
+TOURNAMENT_KEYWORDS = [
+    "world cup", "asian games", "emperor's cup", "emperor", "jfa", "championship",
+    "v-league", "premier league", "champions league", "euro", "copa", "afc", "fifa",
+    "uefa", "serie", "liga", "bundesliga", "u20", "u23", "u19", "u17", "women", "nữ",
+    "cúp", "cup", "giải", "bảng", "vòng"
+]
+
 SLOGAN_KEYWORDS = [
     "giúp bạn", "toàn diện", "thế giới", "bản quyền", "hệ thống", 
     "trải nghiệm", "chất lượng", "miễn phí", "liên hệ", "đăng ký", 
@@ -20,10 +28,8 @@ SLOGAN_KEYWORDS = [
     "uy lực", "soi kèo", "đặt cược", "tốc độ", "tải trang", "cam kết"
 ]
 
-FILTER_KEYWORDS = [
-    "cup", "cúp", "league", "championship", "asian games", "v-league", 
-    "premier", "champions", "euro", "copa", "afc", "fifa", "uefa", 
-    "serie", "liga", "bundesliga", "live", "trực tiếp", "hls", "flv", "xem ngay"
+FILTER_KEYWORDS = TOURNAMENT_KEYWORDS + SLOGAN_KEYWORDS + [
+    "live", "trực tiếp", "hls", "flv", "xem ngay", "phút"
 ]
 
 def clean_str(t):
@@ -33,19 +39,11 @@ def is_invalid_text(text):
     t_lower = text.lower()
     return any(kw in t_lower for kw in SLOGAN_KEYWORDS)
 
-def convert_to_vietnam_time(time_str):
-    """Nếu giờ bị lệch UTC, hàm này đảm bảo hỗ trợ chuẩn giờ Việt Nam"""
-    try:
-        match = re.search(r'(\d{1,2}):(\d{2})', time_str)
-        if match:
-            h, m = int(match.group(1)), int(match.group(2))
-            return f"{h:02d}:{m:02d}"
-    except:
-        pass
-    return "LIVE"
+def is_tournament(text):
+    t_lower = text.lower().strip()
+    return any(kw == t_lower or kw in t_lower for kw in TOURNAMENT_KEYWORDS)
 
 def run_scraper():
-    # Lấy ngày hiện tại theo giờ Việt Nam
     today_str = datetime.now().strftime("%d/%m")
     parsed_matches = []
     seen_keys = set()
@@ -56,7 +54,6 @@ def run_scraper():
             headless=True,
             args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
         )
-        # Bắt buộc Playwright nhận diện Múi giờ Việt Nam (Asia/Ho_Chi_Minh)
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
             viewport={"width": 1280, "height": 720},
@@ -89,13 +86,26 @@ def run_scraper():
                         const href = link.getAttribute('href');
                         if (!href) return;
 
+                        // Tìm logo đội bóng (bỏ qua icon mặt trời / icon trang web)
                         let logo = '';
-                        const imgs = Array.from(card.querySelectorAll('img'));
-                        for (let img of imgs) {
-                            let src = img.getAttribute('src') || img.getAttribute('data-src') || '';
-                            if (src && !src.includes('avatar') && !src.includes('favicon') && !src.includes('banner') && !src.includes('logo-site')) {
-                                logo = src.startsWith('http') ? src : window.location.origin + src;
-                                break;
+                        const teamImgs = Array.from(card.querySelectorAll('[class*="team"] img, [class*="club"] img, [class*="flag"] img, .logo-team img'));
+                        if (teamImgs.length > 0) {
+                            let src = teamImgs[0].getAttribute('src') || teamImgs[0].getAttribute('data-src') || '';
+                            if (src) logo = src.startsWith('http') ? src : window.location.origin + src;
+                        }
+
+                        if (!logo) {
+                            const allImgs = Array.from(card.querySelectorAll('img'));
+                            for (let img of allImgs) {
+                                let src = img.getAttribute('src') || img.getAttribute('data-src') || '';
+                                let srcLower = src.toLowerCase();
+                                if (src && !srcLower.includes('avatar') && !srcLower.includes('favicon') && 
+                                    !srcLower.includes('banner') && !srcLower.includes('logo-site') && 
+                                    !srcLower.includes('sun') && !srcLower.includes('icon-default') &&
+                                    !srcLower.includes('thumb-default')) {
+                                    logo = src.startsWith('http') ? src : window.location.origin + src;
+                                    break;
+                                }
                             }
                         }
 
@@ -124,16 +134,19 @@ def run_scraper():
 
         # 1. Trích xuất giờ
         time_match = re.search(r'(\d{1,2}:\d{2})', text)
-        m_time = convert_to_vietnam_time(time_match.group(1)) if time_match else "LIVE"
+        m_time = time_match.group(1) if time_match else "LIVE"
 
-        # 2. Trích xuất BLV
+        # 2. Trích xuất BLV (Chuẩn hóa chỉ giữ lại tên BLV)
         blv_name = ""
-        blv_match = re.search(r'((?:BLV|Chuối|Gà|Bình luận viên)\s+[A-Za-zÀ-ỹ0-9\s\+]+)', text, re.IGNORECASE)
+        blv_match = re.search(r'((?:BLV|Chuối|Gà|Bình luận viên)\s+[A-Za-zÀ-ỹ0-9]+(?:\s+[A-Za-zÀ-ỹ0-9]+)?)', text, re.IGNORECASE)
         if blv_match:
-            blv_name = clean_str(blv_match.group(1))
-            blv_name = re.split(r'(?:hls|flv|live|trực tiếp|\d{1,2}:\d{2})', blv_name, flags=re.IGNORECASE)[0].strip()
+            raw_blv = clean_str(blv_match.group(1))
+            for kw in TOURNAMENT_KEYWORDS + ["hls", "live", "trực tiếp"]:
+                if kw in raw_blv.lower():
+                    raw_blv = re.split(re.escape(kw), raw_blv, flags=re.IGNORECASE)[0].strip()
+            blv_name = raw_blv
 
-        # 3. Trích xuất Tên 2 đội bóng
+        # 3. Trích xuất Tên 2 đội bóng (Lọc sạch các cụm tên giải đấu dính vào)
         clean_text = re.sub(r'\d{1,2}:\d{2}', '', text)
         clean_text = re.sub(r'\d{1,2}/\d{1,2}', '', clean_text)
 
@@ -142,13 +155,21 @@ def run_scraper():
         if vs_match:
             t1 = clean_str(vs_match.group(1).split('\n')[-1])
             t2 = clean_str(vs_match.group(2).split('\n')[0])
-            if len(t1) >= 2 and len(t2) >= 2 and not t1.isdigit() and not t2.isdigit():
+
+            # Lọc bỏ từ khóa giải đấu ở 2 đầu tên đội
+            for kw in TOURNAMENT_KEYWORDS:
+                t1 = re.sub(r'(?i)^' + re.escape(kw) + r'\s*[-:\.]*\s*', '', t1).strip()
+                t1 = re.sub(r'(?i)\s*[-:\.]*\s*' + re.escape(kw) + r'$', '', t1).strip()
+                t2 = re.sub(r'(?i)^' + re.escape(kw) + r'\s*[-:\.]*\s*', '', t2).strip()
+                t2 = re.sub(r'(?i)\s*[-:\.]*\s*' + re.escape(kw) + r'$', '', t2).strip()
+
+            if len(t1) >= 2 and len(t2) >= 2 and not is_tournament(t1) and not is_tournament(t2):
                 if not is_invalid_text(t1) and not is_invalid_text(t2):
                     teams_str = f"{t1} vs {t2}"
 
         if not teams_str:
             lines = [clean_str(l) for l in clean_text.split('\n') if len(clean_str(l)) >= 2]
-            valid_lines = [l for l in lines if not any(kw in l.lower() for kw in FILTER_KEYWORDS) and not is_invalid_text(l)]
+            valid_lines = [l for l in lines if not any(kw in l.lower() for kw in FILTER_KEYWORDS) and not is_invalid_text(l) and not is_tournament(l)]
             if len(valid_lines) >= 2:
                 teams_str = f"{valid_lines[0]} vs {valid_lines[1]}"
 
