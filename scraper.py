@@ -1,262 +1,161 @@
-import re
 import time
-from datetime import datetime
-import cloudscraper
-from bs4 import BeautifulSoup
+import re
+from urllib.parse import quote
 from playwright.sync_api import sync_playwright
 
-DOMAINS = [
-    "https://chuoichien.tv",
-    "https://bonglautv.pro",
-    "https://chuoichientv1.link",
-    "https://chuoichientv.com",
-    "https://chuoichientv.live"
-]
+# Tên miền Cloudflare Worker mới của anh Sơn
+WORKER_DOMAIN = "cctv.sonnguyen90pro.workers.dev"
 
+BASE_URL = "https://chuoichientv.com"
 OUTPUT_FILE = "playlist.m3u"
-GROUP_NAME = "Chuối Chiến TV"
+GROUP_NAME = "Chuối Chiên TV"
 
-BLV_PATTERNS = [
-    r'Chuối\s+[A-Za-zÀ-ỹ0-9]+',
-    r'BLV\s+[A-Za-zÀ-ỹ0-9]+',
-    r'Bình\s+luận\s+viên\s+[A-Za-zÀ-ỹ0-9]+'
+FILTER_KEYWORDS = [
+    "cup", "cúp", "league", "championship", "v-league", "premier", 
+    "champions", "euro", "copa", "afc", "fifa", "uefa", "serie", "liga"
 ]
 
-BAD_IMG_KEYWORDS = [
-    'sun', 'oca', 'asiad', 'asian', 'banner', 'favicon', 'avatar', 
-    'logo-site', 'default', 'thumb', 'league', 'event', 'icon', 
-    'widget', 'advertisement', 'bg', 'header', 'footer', 'tournament'
-]
+def get_m3u8_for_match(context, match_url):
+    page = context.new_page()
+    page.route("**/*.{png,jpg,jpeg,svg,css,woff,woff2}", lambda route: route.abort())
+    
+    m3u8_found = []
 
-def clean_str(t):
-    return re.sub(r'\s+', ' ', t or '').strip()
+    def handle_request(request):
+        url = request.url
+        if ".m3u8" in url and "blob:" not in url:
+            m3u8_found.append(url)
 
-def parse_teams(text, url):
-    """Trích xuất tên 2 đội thi đấu (Ưu tiên đọc từ URL slug - Chính xác 100%)"""
+    page.on("request", handle_request)
+
     try:
-        path = url.split('?')[0].rstrip('/')
-        slug = path.split('/')[-1]
-        slug = re.sub(r'[-_]\d+$', '', slug)
-        if '-vs-' in slug.lower():
-            parts = re.split(r'-vs-', slug, flags=re.IGNORECASE)
-            t1 = parts[0].replace('-', ' ').strip().title()
-            t2 = parts[1].replace('-', ' ').strip().title()
-            if len(t1) >= 2 and len(t2) >= 2:
-                return f"{t1} vs {t2}"
+        page.goto(match_url, timeout=15000, wait_until="domcontentloaded")
+        for _ in range(8):
+            if m3u8_found:
+                break
+            time.sleep(0.5)
     except Exception:
         pass
+    finally:
+        page.close()
 
-    clean = re.sub(r'\d{1,2}:\d{2}', '', text)
-    clean = re.sub(r'\d{1,2}/\d{1,2}', '', clean)
-    for pat in BLV_PATTERNS:
-        clean = re.sub(pat, '', clean, flags=re.IGNORECASE)
-
-    vs_match = re.search(r'([A-Za-zÀ-ỹ0-9\s\.\-]+)\s+(?:vs|-)\s+([A-Za-zÀ-ỹ0-9\s\.\-]+)', clean, re.IGNORECASE)
-    if vs_match:
-        t1 = clean_str(vs_match.group(1).split('\n')[-1])
-        t2 = clean_str(vs_match.group(2).split('\n')[0])
-        if len(t1) >= 2 and len(t2) >= 2 and "giúp bạn" not in t1.lower():
-            return f"{t1} vs {t2}"
-
-    return ""
-
-def scrape_with_playwright():
-    raw_items = []
-    active_domain = DOMAINS[0]
-    
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=True,
-                args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
-            )
-            context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-                viewport={"width": 1280, "height": 720},
-                timezone_id="Asia/Ho_Chi_Minh",
-                locale="vi-VN"
-            )
-            page = context.new_page()
-
-            for domain in DOMAINS:
-                try:
-                    print(f"[*] [Playwright] Đang thử kết nối: {domain}")
-                    page.goto(domain, timeout=20000, wait_until="domcontentloaded")
-                    page.wait_for_timeout(2500)
-
-                    page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
-                    page.wait_for_timeout(1000)
-
-                    items = page.evaluate('''() => {
-                        const items = [];
-                        const links = Array.from(document.querySelectorAll('a[href]'));
-
-                        const BAD_IMG_KEYWORDS = [
-                            'sun', 'oca', 'asiad', 'asian', 'banner', 'favicon', 'avatar', 
-                            'logo-site', 'default', 'thumb', 'league', 'event', 'icon', 
-                            'widget', 'advertisement', 'bg', 'header', 'footer', 'tournament'
-                        ];
-
-                        links.forEach(a => {
-                            const href = a.getAttribute('href') || '';
-                            if (!href) return;
-
-                            const isMatch = href.includes('/truc-tiep') || 
-                                            href.includes('/match') || 
-                                            href.includes('/live') || 
-                                            href.includes('-vs-') ||
-                                            href.includes('bong-da');
-                            if (!isMatch) return;
-
-                            let card = a;
-                            let curr = a.parentElement;
-                            while (curr && curr.tagName !== 'BODY') {
-                                const otherMatchLinks = curr.querySelectorAll('a[href*="/truc-tiep"], a[href*="/match"], a[href*="/live"], a[href*="-vs-"]');
-                                if (otherMatchLinks.length > 1) break;
-                                card = curr;
-                                curr = curr.parentElement;
-                            }
-
-                            let logo = '';
-                            const imgs = Array.from(card.querySelectorAll('img'));
-                            for (let img of imgs) {
-                                let src = img.getAttribute('data-src') || img.getAttribute('data-original') || img.getAttribute('src') || '';
-                                let srcLower = src.toLowerCase();
-                                if (src && !BAD_IMG_KEYWORDS.some(kw => srcLower.includes(kw))) {
-                                    logo = src.startsWith('http') ? src : window.location.origin + src;
-                                    break;
-                                }
-                            }
-
-                            items.push({
-                                url: href.startsWith('http') ? href : window.location.origin + href,
-                                text: card.innerText || a.innerText || '',
-                                logo: logo
-                            });
-                        });
-                        return items;
-                    }''')
-
-                    if items and len(items) > 0:
-                        raw_items = items
-                        active_domain = domain
-                        print(f"[+] Playwright lấy thành công {len(raw_items)} trận tại {domain}")
-                        break
-                except Exception as e:
-                    print(f"[-] Playwright lỗi kết nối {domain}: {e}")
-
-            browser.close()
-    except Exception as e:
-        print(f"[-] Lỗi Playwright: {e}")
-
-    return raw_items, active_domain
-
-def scrape_with_cloudscraper():
-    """Dự phòng: Dùng Cloudscraper nếu Playwright bị Cloudflare chặn"""
-    raw_items = []
-    active_domain = DOMAINS[0]
-    
-    scraper = cloudscraper.create_scraper(
-        browser={'browser': 'chrome', 'platform': 'android', 'desktop': False}
-    )
-
-    for domain in DOMAINS:
-        try:
-            print(f"[*] [Cloudscraper] Đang thử kết nối: {domain}")
-            res = scraper.get(domain, timeout=15)
-            if res.status_code == 200 and len(res.text) > 1000:
-                soup = BeautifulSoup(res.text, 'html.parser')
-                links = soup.find_all('a', href=True)
-                for a in links:
-                    href = a['href']
-                    if any(k in href for k in ['/truc-tiep', '/match', '/live', '-vs-', 'bong-da']):
-                        full_url = href if href.startswith('http') else domain.rstrip('/') + '/' + href.lstrip('/')
-                        card = a.find_parent(['div', 'li']) or a
-                        text = card.get_text(separator=' ', strip=True)
-                        
-                        logo = ""
-                        imgs = card.find_all('img')
-                        for img in imgs:
-                            src = img.get('data-src') or img.get('src') or ""
-                            src_lower = src.lower()
-                            if src and not any(kw in src_lower for kw in BAD_IMG_KEYWORDS):
-                                logo = src if src.startswith('http') else domain.rstrip('/') + '/' + src.lstrip('/')
-                                break
-                        
-                        raw_items.append({
-                            'url': full_url,
-                            'text': text,
-                            'logo': logo
-                        })
-                if raw_items:
-                    active_domain = domain
-                    print(f"[+] Cloudscraper lấy thành công {len(raw_items)} trận tại {domain}")
-                    break
-        except Exception as e:
-            print(f"[-] Cloudscraper lỗi {domain}: {e}")
-
-    return raw_items, active_domain
+    return m3u8_found[0] if m3u8_found else None
 
 def run_scraper():
-    today_str = datetime.now().strftime("%d/%m")
-    
-    # 1. Thử lấy bằng Playwright
-    raw_items, active_domain = scrape_with_playwright()
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
+        )
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            viewport={"width": 1280, "height": 720}
+        )
+        page = context.new_page()
 
-    # 2. Nếu Playwright không ra trận nào, kích hoạt Cloudscraper ngay
-    if not raw_items:
-        print("[!] Playwright không lấy được dữ liệu, chuyển sang Cloudscraper...")
-        raw_items, active_domain = scrape_with_cloudscraper()
+        final_matches = []
+        try:
+            print(f"[*] Đang tải trang chủ: {BASE_URL}")
+            page.goto(BASE_URL, timeout=60000, wait_until="domcontentloaded")
+            page.wait_for_timeout(3000)
 
-    parsed_matches = []
-    seen_urls = set()
+            # Bóc tách danh sách trận đấu từ Chuối Chiên TV
+            raw_matches = page.evaluate('''() => {
+                const matches = [];
+                const cards = Array.from(document.querySelectorAll('a[href*="/truc-tiep/"], a[href*="/match/"], a[href*="/xem-bong-da/"], .match-item, .card-match'));
 
-    for item in raw_items:
-        url = item['url']
-        text = item['text']
+                cards.forEach(card => {
+                    const linkEl = card.tagName === 'A' ? card : card.querySelector('a');
+                    if (!linkEl) return;
+                    
+                    const href = linkEl.getAttribute('href');
+                    if (!href) return;
 
-        if url in seen_urls:
-            continue
+                    let logo = '';
+                    const img = card.querySelector('img');
+                    if (img) {
+                        logo = img.getAttribute('src') || img.getAttribute('data-src') || '';
+                        if (logo && !logo.startsWith('http')) logo = window.location.origin + logo;
+                    }
 
-        blv_name = ""
-        for pat in BLV_PATTERNS:
-            m_blv = re.search(pat, text, re.IGNORECASE)
-            if m_blv:
-                blv_name = clean_str(m_blv.group(0))
-                break
+                    matches.push({
+                        url: href.startsWith('http') ? href : window.location.origin + href,
+                        text: card.innerText || '',
+                        logo: logo
+                    });
+                });
 
-        time_match = re.search(r'(\d{1,2}:\d{2})', text)
-        m_time = time_match.group(1) if time_match else "LIVE"
+                return matches;
+            }''')
 
-        teams_str = parse_teams(text, url)
-        if not teams_str:
-            continue
+            unique_matches = {}
+            for item in raw_matches:
+                url = item['url']
+                text = item['text']
+                if not text or url in unique_matches:
+                    continue
 
-        blv_suffix = f" ({blv_name})" if blv_name else ""
-        title = f"{m_time} {today_str} ⚽ {teams_str}{blv_suffix} [hls]"
+                # Lấy thời gian
+                time_match = re.search(r'(\d{1,2}:\d{2})', text)
+                date_match = re.search(r'(\d{1,2}/\d{1,2})', text)
+                m_time = time_match.group(1) if time_match else "LIVE"
+                m_date = date_match.group(1) if date_match else ""
+                time_str = f"{m_time} {m_date}".strip()
 
-        seen_urls.add(url)
-        parsed_matches.append({
-            "title": title,
-            "logo": item['logo'],
-            "url": url
-        })
+                # Lấy tên BLV (Ví dụ: Chuối Chao, Chuối Kem, Chuối Tây, Chuối To...)
+                blv_match = re.search(r'\((Chuối\s+[A-Za-zÀ-ỹ0-9\s]+)\)', text, re.IGNORECASE)
+                blv_str = f" ({blv_match.group(1)})" if blv_match else ""
 
-    print(f"[*] TỔNG SỐ TRẬN ĐẤU CÀO THÀNH CÔNG: {len(parsed_matches)}")
+                # Làm sạch tiêu đề trận đấu
+                lines = [l.strip() for l in text.split('\n') if l.strip() and not re.search(r'\d{1,2}:\d{2}', l)]
+                title_clean = " ".join(lines[:2]) if lines else "Trận đấu Trực Tiếp"
+                title_clean = re.sub(r'\[hls\]|\[flv\]', '', title_clean, flags=re.IGNORECASE).strip()
 
-    # Ghi file playlist.m3u
+                full_title = f"{time_str} ⚽ {title_clean}{blv_str}"
+
+                unique_matches[url] = {
+                    "title": full_title,
+                    "logo": item['logo'],
+                    "url": url
+                }
+
+            match_list = list(unique_matches.values())
+            print(f"[*] Tìm thấy {len(match_list)} trận đấu từ Chuối Chiên TV.")
+
+            page.close()
+
+            # Quét tìm luồng stream m3u8
+            for idx, match in enumerate(match_list):
+                print(f"[{idx+1}/{len(match_list)}] Tìm stream cho: {match['title']}")
+                m3u8_url = get_m3u8_for_match(context, match['url'])
+                match['m3u8_url'] = m3u8_url
+
+            final_matches = match_list
+
+        except Exception as e:
+            print(f"Lỗi khi cào dữ liệu: {e}")
+        finally:
+            browser.close()
+
+    # Xuất dữ liệu ra file playlist.m3u
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n\n")
-        if not parsed_matches:
-            f.write(f'#EXTINF:-1 tvg-logo="{active_domain}/favicon.ico" group-title="{GROUP_NAME}",Chưa có trận đấu nào\n')
-            f.write("http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4\n")
-        else:
-            for m in parsed_matches:
-                logo_attr = f'tvg-logo="{m["logo"]}"' if m["logo"] else ''
-                f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{m["title"]}\n')
-                f.write(f'#EXTVLCOPT:http-referrer={active_domain}/\n')
-                f.write(f'#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)\n')
-                f.write(f'{m["url"]}|Referer={active_domain}/&User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)\n\n')
+
+        for item in final_matches:
+            logo_attr = f'tvg-logo="{item["logo"]}"' if item["logo"] else ''
+            
+            if item.get('m3u8_url'):
+                encoded_m3u8 = quote(item['m3u8_url'], safe='')
+                encoded_ref = quote(BASE_URL + '/', safe='')
+                # Truyền tham số referer qua Cloudflare Worker để bypass chặn
+                stream_url = f"https://{WORKER_DOMAIN}/proxy?url={encoded_m3u8}&referer={encoded_ref}"
+            else:
+                stream_url = f"https://{WORKER_DOMAIN}/live?url={quote(item['url'], safe='')}"
+            
+            f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{item["title"]}\n')
+            f.write(f'{stream_url}\n\n')
+
+    print(f"[*] Đã hoàn tất xuất file {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     run_scraper()
