@@ -13,35 +13,38 @@ DOMAINS = [
 OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Chuối Chiến TV"
 
-# Danh sách từ khóa giải đấu cần lọc sạch khỏi tên đội và BLV
-TOURNAMENT_KEYWORDS = [
+# Từ khóa cấm xuất hiện trong tên đội bóng (giải đấu, môn thể thao, từ ngữ hệ thống)
+INVALID_TEAM_KEYWORDS = [
+    "bóng chuyền", "bóng rổ", "bóng đá", "vô địch", "châu âu", "châu á", 
     "world cup", "asian games", "emperor's cup", "emperor", "jfa", "championship",
     "v-league", "premier league", "champions league", "euro", "copa", "afc", "fifa",
     "uefa", "serie", "liga", "bundesliga", "u20", "u23", "u19", "u17", "women", "nữ",
-    "cúp", "cup", "giải", "bảng", "vòng"
+    "cúp", "cup", "giải", "bảng", "vòng", "trực tiếp", "live", "hls", "flv", "xem ngay",
+    "giúp bạn", "toàn diện", "thế giới", "bản quyền", "hệ thống", "trải nghiệm",
+    "soi kèo", "đặt cược", "cam kết"
 ]
 
-SLOGAN_KEYWORDS = [
-    "giúp bạn", "toàn diện", "thế giới", "bản quyền", "hệ thống", 
-    "trải nghiệm", "chất lượng", "miễn phí", "liên hệ", "đăng ký", 
-    "khuyến mãi", "chuoichien", "bonglau", "người xem", "phát sóng",
-    "uy lực", "soi kèo", "đặt cược", "tốc độ", "tải trang", "cam kết"
-]
-
-FILTER_KEYWORDS = TOURNAMENT_KEYWORDS + SLOGAN_KEYWORDS + [
-    "live", "trực tiếp", "hls", "flv", "xem ngay", "phút"
+# Pattern nhận diện tên các BLV Chuối Chiến để loại bỏ hoàn toàn trước khi bắt tên đội
+BLV_PATTERNS = [
+    r'Chuối\s+(?:Tây|Nhỏ|To|Kem|Lá|Lửa|Chín|Xanh|Đỏ|Siêu|Gà|Sơn|Nổ|Béo|Gáy|Ngố|Cả)',
+    r'BLV\s+[A-Za-zÀ-ỹ0-9]+',
+    r'Bình\s+luận\s+viên\s+[A-Za-zÀ-ỹ0-9]+'
 ]
 
 def clean_str(t):
     return re.sub(r'\s+', ' ', t or '').strip()
 
-def is_invalid_text(text):
-    t_lower = text.lower()
-    return any(kw in t_lower for kw in SLOGAN_KEYWORDS)
-
-def is_tournament(text):
-    t_lower = text.lower().strip()
-    return any(kw == t_lower or kw in t_lower for kw in TOURNAMENT_KEYWORDS)
+def is_invalid_team(name):
+    n_lower = name.lower().strip()
+    if len(n_lower) < 2:
+        return True
+    # Tên đội tuyệt đối KHÔNG chứa từ "chuối" hoặc "blv"
+    if "chuối" in n_lower or "blv" in n_lower:
+        return True
+    # Không dính các từ khóa giải đấu/môn thể thao
+    if any(kw in n_lower for kw in INVALID_TEAM_KEYWORDS):
+        return True
+    return False
 
 def run_scraper():
     today_str = datetime.now().strftime("%d/%m")
@@ -86,7 +89,6 @@ def run_scraper():
                         const href = link.getAttribute('href');
                         if (!href) return;
 
-                        // Tìm logo đội bóng (bỏ qua icon mặt trời / icon trang web)
                         let logo = '';
                         const teamImgs = Array.from(card.querySelectorAll('[class*="team"] img, [class*="club"] img, [class*="flag"] img, .logo-team img'));
                         if (teamImgs.length > 0) {
@@ -129,51 +131,56 @@ def run_scraper():
 
     for item in raw_items:
         text = item['text']
-        if not text or is_invalid_text(text):
+        if not text or len(text.strip()) < 3:
             continue
 
-        # 1. Trích xuất giờ
+        # 1. Trích xuất tên BLV
+        blv_name = ""
+        for pat in BLV_PATTERNS:
+            m_blv = re.search(pat, text, re.IGNORECASE)
+            if m_blv:
+                blv_name = clean_str(m_blv.group(0))
+                break
+
+        # 2. XÓA SẠCH tên BLV khỏi văn bản trước khi trích xuất tên đội bóng
+        text_clean = text
+        if blv_name:
+            text_clean = re.sub(re.escape(blv_name), '', text_clean, flags=re.IGNORECASE)
+        for pat in BLV_PATTERNS:
+            text_clean = re.sub(pat, '', text_clean, flags=re.IGNORECASE)
+
+        # 3. Trích xuất giờ
         time_match = re.search(r'(\d{1,2}:\d{2})', text)
         m_time = time_match.group(1) if time_match else "LIVE"
 
-        # 2. Trích xuất BLV (Chuẩn hóa chỉ giữ lại tên BLV)
-        blv_name = ""
-        blv_match = re.search(r'((?:BLV|Chuối|Gà|Bình luận viên)\s+[A-Za-zÀ-ỹ0-9]+(?:\s+[A-Za-zÀ-ỹ0-9]+)?)', text, re.IGNORECASE)
-        if blv_match:
-            raw_blv = clean_str(blv_match.group(1))
-            for kw in TOURNAMENT_KEYWORDS + ["hls", "live", "trực tiếp"]:
-                if kw in raw_blv.lower():
-                    raw_blv = re.split(re.escape(kw), raw_blv, flags=re.IGNORECASE)[0].strip()
-            blv_name = raw_blv
-
-        # 3. Trích xuất Tên 2 đội bóng (Lọc sạch các cụm tên giải đấu dính vào)
-        clean_text = re.sub(r'\d{1,2}:\d{2}', '', text)
+        # 4. Làm sạch thời gian & ngày tháng
+        clean_text = re.sub(r'\d{1,2}:\d{2}', '', text_clean)
         clean_text = re.sub(r'\d{1,2}/\d{1,2}', '', clean_text)
 
+        # 5. Trích xuất Tên 2 đội bóng
         teams_str = ""
         vs_match = re.search(r'([A-Za-zÀ-ỹ0-9\s\.\-]+)\s+(?:vs|-)\s+([A-Za-zÀ-ỹ0-9\s\.\-]+)', clean_text, re.IGNORECASE)
         if vs_match:
             t1 = clean_str(vs_match.group(1).split('\n')[-1])
             t2 = clean_str(vs_match.group(2).split('\n')[0])
 
-            # Lọc bỏ từ khóa giải đấu ở 2 đầu tên đội
-            for kw in TOURNAMENT_KEYWORDS:
+            # Loại bỏ các từ khóa giải đấu ở 2 đầu tên đội
+            for kw in INVALID_TEAM_KEYWORDS:
                 t1 = re.sub(r'(?i)^' + re.escape(kw) + r'\s*[-:\.]*\s*', '', t1).strip()
                 t1 = re.sub(r'(?i)\s*[-:\.]*\s*' + re.escape(kw) + r'$', '', t1).strip()
                 t2 = re.sub(r'(?i)^' + re.escape(kw) + r'\s*[-:\.]*\s*', '', t2).strip()
                 t2 = re.sub(r'(?i)\s*[-:\.]*\s*' + re.escape(kw) + r'$', '', t2).strip()
 
-            if len(t1) >= 2 and len(t2) >= 2 and not is_tournament(t1) and not is_tournament(t2):
-                if not is_invalid_text(t1) and not is_invalid_text(t2):
-                    teams_str = f"{t1} vs {t2}"
+            if not is_invalid_team(t1) and not is_invalid_team(t2):
+                teams_str = f"{t1} vs {t2}"
 
         if not teams_str:
             lines = [clean_str(l) for l in clean_text.split('\n') if len(clean_str(l)) >= 2]
-            valid_lines = [l for l in lines if not any(kw in l.lower() for kw in FILTER_KEYWORDS) and not is_invalid_text(l) and not is_tournament(l)]
+            valid_lines = [l for l in lines if not is_invalid_team(l)]
             if len(valid_lines) >= 2:
                 teams_str = f"{valid_lines[0]} vs {valid_lines[1]}"
 
-        if not teams_str or is_invalid_text(teams_str):
+        if not teams_str or is_invalid_team(teams_str):
             continue
 
         blv_suffix = f" ({blv_name})" if blv_name else ""
