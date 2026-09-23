@@ -24,7 +24,6 @@ def clean_str(t):
 
 def parse_teams(text, url):
     """Trích xuất tên 2 đội thi đấu (Ưu tiên đọc từ URL slug nếu văn bản bị lỗi)"""
-    # Cách 1: Đọc từ URL slug (Chính xác 100% không lo dính tên BLV hay slogan)
     try:
         slug = url.split('?')[0].rstrip('/').split('/')[-1]
         slug = re.sub(r'-\d+$', '', slug)
@@ -37,7 +36,6 @@ def parse_teams(text, url):
     except:
         pass
 
-    # Cách 2: Bóc tách bằng Regex từ văn bản
     clean = re.sub(r'\d{1,2}:\d{2}', '', text)
     clean = re.sub(r'\d{1,2}/\d{1,2}', '', clean)
     for pat in BLV_PATTERNS:
@@ -81,10 +79,17 @@ def run_scraper():
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
                 page.wait_for_timeout(1000)
 
-                # Thu thập tất cả liên kết trận đấu đơn giản, không lặp phức tạp
+                # Thu thập link trận đấu & lọc bỏ logo mặt trời OCA / logo giải đấu
                 raw_items = page.evaluate('''() => {
                     const items = [];
                     const links = Array.from(document.querySelectorAll('a[href]'));
+
+                    // Từ khóa ảnh KHÔNG PHẢI logo đội bóng (Logo mặt trời Asiad, logo trang, banner...)
+                    const BAD_IMG_KEYWORDS = [
+                        'sun', 'oca', 'asiad', 'asian', 'banner', 'favicon', 'avatar', 
+                        'logo-site', 'default', 'thumb', 'league', 'event', 'icon', 
+                        'widget', 'advertisement', 'bg', 'header', 'footer', 'tournament'
+                    ];
 
                     links.forEach(a => {
                         const href = a.getAttribute('href') || '';
@@ -100,15 +105,27 @@ def run_scraper():
                         const card = a.closest('.match-item, .card-match, .item-match, .item, .card, div') || a;
 
                         let logo = '';
-                        const imgs = Array.from(card.querySelectorAll('img'));
-                        for (let img of imgs) {
-                            let src = img.getAttribute('src') || img.getAttribute('data-src') || '';
+                        // Ưu tiên 1: Lấy ảnh trong các thẻ chứa cờ / logo đội bóng
+                        const teamImgs = Array.from(card.querySelectorAll('[class*="team"] img, [class*="club"] img, [class*="flag"] img, .logo-team img, .team-logo img'));
+                        for (let img of teamImgs) {
+                            let src = img.getAttribute('data-src') || img.getAttribute('data-original') || img.getAttribute('src') || '';
                             let srcLower = src.toLowerCase();
-                            if (src && !srcLower.includes('avatar') && !srcLower.includes('favicon') && 
-                                !srcLower.includes('banner') && !srcLower.includes('logo-site') && 
-                                !srcLower.includes('sun')) {
+                            if (src && !BAD_IMG_KEYWORDS.some(kw => srcLower.includes(kw))) {
                                 logo = src.startsWith('http') ? src : window.location.origin + src;
                                 break;
+                            }
+                        }
+
+                        // Ưu tiên 2: Quét toàn bộ img nhưng lọc khắt khe
+                        if (!logo) {
+                            const allImgs = Array.from(card.querySelectorAll('img'));
+                            for (let img of allImgs) {
+                                let src = img.getAttribute('data-src') || img.getAttribute('data-original') || img.getAttribute('src') || '';
+                                let srcLower = src.toLowerCase();
+                                if (src && !BAD_IMG_KEYWORDS.some(kw => srcLower.includes(kw))) {
+                                    logo = src.startsWith('http') ? src : window.location.origin + src;
+                                    break;
+                                }
                             }
                         }
 
@@ -130,7 +147,6 @@ def run_scraper():
 
         browser.close()
 
-    # Xử lý và lọc trùng lặp
     for item in raw_items:
         url = item['url']
         text = item['text']
@@ -167,7 +183,7 @@ def run_scraper():
 
     print(f"[*] Tổng số trận đấu lấy thành công: {len(parsed_matches)}")
 
-    # Ghi xuất file playlist.m3u
+    # Ghi file playlist.m3u
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n\n")
         if not parsed_matches:
