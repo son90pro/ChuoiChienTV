@@ -13,7 +13,12 @@ DOMAINS = [
 OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Chuối Chiến TV"
 
-# CHỈ lọc bỏ các từ rác / quảng cáo (KHÔNG chặn U23, U20, Cup, Nữ...)
+BLV_PATTERNS = [
+    r'Chuối\s+(?:Tây|Nhỏ|To|Kem|Lá|Lửa|Chín|Xanh|Đỏ|Siêu|Gà|Sơn|Nổ|Béo|Gáy|Ngố|Cả)',
+    r'BLV\s+[A-Za-zÀ-ỹ0-9]+',
+    r'Bình\s+luận\s+viên\s+[A-Za-zÀ-ỹ0-9]+'
+]
+
 SPAM_KEYWORDS = [
     "giúp bạn", "toàn diện", "thế giới", "bản quyền", "hệ thống", 
     "trải nghiệm", "chất lượng", "miễn phí", "liên hệ", "đăng ký", 
@@ -21,20 +26,24 @@ SPAM_KEYWORDS = [
     "cam kết", "tải trang", "uy lực", "phát sóng"
 ]
 
-BLV_PATTERNS = [
-    r'Chuối\s+(?:Tây|Nhỏ|To|Kem|Lá|Lửa|Chín|Xanh|Đỏ|Siêu|Gà|Sơn|Nổ|Béo|Gáy|Ngố|Cả)',
-    r'BLV\s+[A-Za-zÀ-ỹ0-9]+',
-    r'Bình\s+luận\s+viên\s+[A-Za-zÀ-ỹ0-9]+'
-]
-
 def clean_str(t):
     return re.sub(r'\s+', ' ', t or '').strip()
 
-def is_spam(text):
-    t_lower = text.lower().strip()
-    if len(t_lower) < 2 or "chuối" in t_lower or "blv" in t_lower:
-        return True
-    return any(kw in t_lower for kw in SPAM_KEYWORDS)
+def extract_teams_from_url(url):
+    """Trích xuất tên 2 đội trực tiếp từ URL slug khi chữ trên web bị dính lỗi"""
+    try:
+        path = url.split('?')[0].rstrip('/')
+        slug = path.split('/')[-1]
+        slug = re.sub(r'[-_]\d+$', '', slug)
+        if '-vs-' in slug.lower():
+            parts = re.split(r'-vs-', slug, flags=re.IGNORECASE)
+            t1 = parts[0].replace('-', ' ').strip().title()
+            t2 = parts[1].replace('-', ' ').strip().title()
+            if len(t1) >= 2 and len(t2) >= 2:
+                return f"{t1} vs {t2}"
+    except:
+        pass
+    return ""
 
 def run_scraper():
     today_str = datetime.now().strftime("%d/%m")
@@ -62,11 +71,11 @@ def run_scraper():
                 page.goto(domain, timeout=30000, wait_until="domcontentloaded")
                 page.wait_for_timeout(4000)
 
-                # Cuộn trang nhiều lần để tải hết danh sách trận (Lazy load)
                 for _ in range(3):
                     page.evaluate("window.scrollBy(0, 1000)")
                     page.wait_for_timeout(800)
 
+                # CÔ LẬP THẺ: Chỉ lấy đúng khung chứa duy nhất 1 đường dẫn trận đấu
                 raw_items = page.evaluate('''() => {
                     const results = [];
                     const links = Array.from(document.querySelectorAll('a[href*="/truc-tiep"], a[href*="/match"], a[href*="/live"], a[href*="-vs-"]'));
@@ -75,11 +84,22 @@ def run_scraper():
                         const href = link.getAttribute('href');
                         if (!href) return;
 
-                        let card = link.closest('.match-item, .card-match, .item-match, .item, .card, div[class*="match"]') || link;
+                        // Leo ngược cây DOM đến khi gặp thẻ cha chứa nhiều hơn 1 trận đấu thì dừng lại
+                        let container = link;
+                        let parent = link.parentElement;
+                        while (parent && parent.tagName !== 'BODY') {
+                            const matchLinksInParent = parent.querySelectorAll('a[href*="/truc-tiep"], a[href*="/match"], a[href*="/live"], a[href*="-vs-"]');
+                            if (matchLinksInParent.length > 1) {
+                                break;
+                            }
+                            container = parent;
+                            parent = parent.parentElement;
+                        }
 
+                        // Lấy logo độc quyền bên trong container cô lập này
                         let logo = '';
-                        const teamImgs = Array.from(card.querySelectorAll('[class*="team"] img, [class*="club"] img, [class*="flag"] img, .logo-team img, img'));
-                        for (let img of teamImgs) {
+                        const imgs = Array.from(container.querySelectorAll('img'));
+                        for (let img of imgs) {
                             let src = img.getAttribute('src') || img.getAttribute('data-src') || '';
                             let srcLower = src.toLowerCase();
                             if (src && !srcLower.includes('avatar') && !srcLower.includes('favicon') && 
@@ -92,7 +112,7 @@ def run_scraper():
 
                         results.push({
                             url: href.startsWith('http') ? href : window.location.origin + href,
-                            text: card.innerText || link.innerText || '',
+                            text: container.innerText || link.innerText || '',
                             logo: logo
                         });
                     });
@@ -101,7 +121,7 @@ def run_scraper():
 
                 if raw_items:
                     active_domain = domain
-                    print(f"[+] Lấy thành công {len(raw_items)} phần tử tại {domain}")
+                    print(f"[+] Lấy thành công {len(raw_items)} phần tử cô lập tại {domain}")
                     break
             except Exception as e:
                 print(f"[-] Không thể kết nối {domain}: {e}")
@@ -123,7 +143,7 @@ def run_scraper():
                 blv_name = clean_str(m_blv.group(0))
                 break
 
-        # 2. Xóa BLV khỏi văn bản
+        # 2. Xóa BLV khỏi đoạn văn bản
         text_clean = text
         if blv_name:
             text_clean = re.sub(re.escape(blv_name), '', text_clean, flags=re.IGNORECASE)
@@ -141,20 +161,12 @@ def run_scraper():
         if vs_match:
             t1 = clean_str(vs_match.group(1).split('\n')[-1])
             t2 = clean_str(vs_match.group(2).split('\n')[0])
-            if not is_spam(t1) and not is_spam(t2) and len(t1) >= 2 and len(t2) >= 2:
+            if len(t1) >= 2 and len(t2) >= 2 and not any(kw in t1.lower() or kw in t2.lower() for kw in SPAM_KEYWORDS):
                 teams_str = f"{t1} vs {t2}"
 
-        # Nếu không tìm thấy cặp vs bằng chữ, lấy tên 2 đội trực tiếp từ link URL slug
-        if not teams_str and '-vs-' in url:
-            try:
-                slug = url.split('/')[-1].split('?')[0]
-                slug = re.sub(r'-\d+$', '', slug)
-                parts = slug.split('-vs-')
-                t1 = parts[0].replace('-', ' ').title()
-                t2 = parts[1].replace('-', ' ').title()
-                teams_str = f"{t1} vs {t2}"
-            except:
-                pass
+        # Dự phòng trích xuất tên đội từ URL slug
+        if not teams_str:
+            teams_str = extract_teams_from_url(url)
 
         if not teams_str:
             continue
@@ -169,7 +181,7 @@ def run_scraper():
             "url": url
         })
 
-    print(f"[*] Tổng số trận thu thập được: {len(parsed_matches)}")
+    print(f"[*] Tổng số trận bóc tách chuẩn xác: {len(parsed_matches)}")
 
     # Ghi file playlist.m3u
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
