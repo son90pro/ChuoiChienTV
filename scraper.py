@@ -1,6 +1,6 @@
 import time
 import re
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 from playwright.sync_api import sync_playwright
 
 WORKER_DOMAIN = "cctv.sonnguyen90pro.workers.dev"
@@ -10,9 +10,11 @@ OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Chuối Chiên TV"
 DEFAULT_LOGO = "https://raw.githubusercontent.com/iptv-org/iptv/master/logos/sports.png"
 
+# Các từ khóa hệ thống hoặc rác cần loại bỏ
 IGNORE_KEYWORDS = [
     'về chuoichien', 'về chuối chiên', 'trang chủ', 'giới thiệu', 'điều khoản',
-    'chính sách', 'liên hệ', 'quảng cáo', 'tải app', 'bảng xếp hạng', 'lịch thi đấu', 'cookie', 'đăng nhập'
+    'chính sách', 'liên hệ', 'quảng cáo', 'tải app', 'bảng xếp hạng', 'lịch thi đấu',
+    'cookie', 'đăng nhập', 'dang-nhap', 'register', 'login', 'author', 'category'
 ]
 
 LEAGUE_KEYWORDS = [
@@ -149,32 +151,32 @@ def run_scraper():
             page.goto(BASE_URL, timeout=40000, wait_until="domcontentloaded")
             page.wait_for_timeout(5000)
 
-            # Cuộn trang để kích hoạt nội dung
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight / 3)")
+            # Cuộn xuống để ép trang tải toàn bộ nội dung động
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            time.sleep(3)
+            page.evaluate("window.scrollTo(0, 0)")
             time.sleep(2)
 
             raw_matches = page.evaluate('''() => {
                 const matches = [];
-                // Quét rộng toàn bộ các thẻ a có khả năng chứa trận đấu
                 const allLinks = Array.from(document.querySelectorAll('a'));
 
                 allLinks.forEach(link => {
                     const href = link.getAttribute('href');
-                    if (!href || href === '#' || href.startsWith('javascript')) return;
+                    if (!href || href === '#' || href.startsWith('javascript') || href.startsWith('tel:') || href.startsWith('mailto:')) return;
                     
-                    // Chỉ lấy các link dẫn đến trang xem trực tiếp hoặc chi tiết trận
-                    if (!href.includes('/truc-tiep/') && !href.includes('/match/') && !href.includes('/xem/') && !href.includes('/live/') && !href.includes('/room/')) {
-                        return;
-                    }
+                    # Bỏ qua link trỏ ra ngoài tên miền chính
+                    if (href.startsWith('http') && !href.includes(window.location.hostname)) return;
 
-                    const card = link.closest('div') || link;
+                    # Tìm card/khối chứa link này để lấy nội dung text và hình ảnh toàn diện
+                    const card = link.closest('.match-item, .card, .item, div[class*="match"], div[class*="item"], article') || link.closest('div') || link;
                     const fullText = card.innerText || link.innerText || '';
 
                     let logo = '';
                     const imgs = Array.from(card.querySelectorAll('img'));
                     for (let img of imgs) {
                         let src = img.getAttribute('src') || img.getAttribute('data-src') || '';
-                        if (src && !src.includes('favicon') && !src.includes('icon')) {
+                        if (src && !src.includes('favicon') && !src.includes('icon') && !src.includes('logo-site')) {
                             logo = src.startsWith('http') ? src : window.location.origin + src;
                             break;
                         }
@@ -193,14 +195,17 @@ def run_scraper():
             unique_matches = {}
             for item in raw_matches:
                 url = item['url']
-                text = item['fullText']
-                if not text or url in unique_matches:
+                text = item['fullText'].strip()
+                
+                # Bỏ qua nếu text quá ngắn hoặc trùng URL
+                if len(text) < 5 or url in unique_matches:
                     continue
 
                 text_lower = text.lower()
                 if any(ignore_kw in text_lower for ignore_kw in IGNORE_KEYWORDS):
                     continue
 
+                # Chỉ nhận các card có vẻ là trận đấu (thường chứa thời gian hoặc ký hiệu đấu)
                 title, logo = parse_match_card(text, item['logo'])
 
                 unique_matches[url] = {
@@ -212,7 +217,7 @@ def run_scraper():
             match_list = list(unique_matches.values())
             page.close()
 
-            print(f"[*] Tìm thấy {len(match_list)} trận đấu. Đang lấy link m3u8...")
+            print(f"[*] Tổng số link trận đấu hợp lệ quét được: {len(match_list)}. Đang trích xuất link m3u8...")
             for idx, match in enumerate(match_list):
                 print(f"[{idx+1}/{len(match_list)}] Lấy link: {match['title']}")
                 m3u8_url = get_m3u8_for_match(context, match['url'])
