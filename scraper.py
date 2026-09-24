@@ -4,38 +4,39 @@ from urllib.parse import quote
 from playwright.sync_api import sync_playwright
 
 WORKER_DOMAIN = "cctv.sonnguyen90pro.workers.dev"
-BASE_URL = "https://live07.chuoichientv.me"
+BASE_URL = "https://phalang.tv"
 
 OUTPUT_FILE = "playlist.m3u"
-GROUP_NAME = "Chuối Chiên TV"
+GROUP_NAME = "Phà Lăng TV"
 
-# Danh sách từ khóa menu hệ thống cần loại bỏ
+# Từ khóa menu/trang tĩnh cần lọc bỏ
 EXCLUDE_KEYWORDS = [
-    'lịch thi đấu', 'kết quả', 'tin thể thao', 'top nhà cái', 'đăng nhập', 
-    'trang chủ', 'tải app', 'khuyến mãi', 'nạp tiền', 'rút tiền', 'bảng xếp hạng',
-    'trang chủ chính thức', 'landing', 'chính sách', 'giới thiệu', 'liên hệ'
+    'lịch thi đấu', 'kết quả', 'tin tức', 'bảng xếp hạng', 'soi kèo',
+    'nhà cái', 'đăng ký', 'đăng nhập', 'khuyến mãi', 'liên hệ', 'giới thiệu',
+    'chính sách', 'hướng dẫn', 'tải app', 'privacy', 'terms'
 ]
 
-def is_real_match(text, href):
-    low_text = text.lower()
+def is_valid_match_url(href, text):
     low_href = href.lower()
+    low_text = text.lower()
 
-    # Bỏ các link chứa từ khóa menu
+    # Bỏ qua các mục menu
     for kw in EXCLUDE_KEYWORDS:
-        if kw in low_text:
+        if kw in low_text or kw.replace(' ', '-') in low_href:
             return False
 
-    # Bỏ link trang chủ hoặc anchor rỗng
+    # Bỏ qua link trang chủ hoặc anchor rỗng
     if low_href.strip() in [BASE_URL.lower(), BASE_URL.lower() + "/", "#", "javascript:void(0)"]:
         return False
 
-    if any(k in low_href for k in ['/lich-thi-dau', '/ket-qua', '/tin-tuc', '/top-nha-cai', '/dang-nhap']):
+    if len(href) <= len(BASE_URL) + 2:
         return False
 
     return True
 
 def get_m3u8_for_match(context, match_url):
     page = context.new_page()
+    # Chặn ảnh và font để tăng tốc độ tải trang
     page.route("**/*.{png,jpg,jpeg,svg,css,woff,woff2}", lambda route: route.abort())
     
     m3u8_found = []
@@ -48,8 +49,8 @@ def get_m3u8_for_match(context, match_url):
     page.on("request", handle_request)
 
     try:
-        page.goto(match_url, timeout=12000, wait_until="domcontentloaded")
-        for _ in range(6):
+        page.goto(match_url, timeout=15000, wait_until="domcontentloaded")
+        for _ in range(10):
             if m3u8_found:
                 break
             time.sleep(0.5)
@@ -75,12 +76,15 @@ def run_scraper():
         page = context.new_page()
 
         try:
-            print(f"[*] Đang tải trang live: {BASE_URL}")
+            print(f"[*] Đang tải trang chủ Phà Lăng TV: {BASE_URL}")
             page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
             page.wait_for_timeout(4000)
 
+            # Cuộn trang để hiển thị đầy đủ các trận đấu
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
+            time.sleep(2)
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            time.sleep(3)
+            time.sleep(2)
             page.evaluate("window.scrollTo(0, 0)")
             time.sleep(1)
 
@@ -96,9 +100,9 @@ def run_scraper():
                     
                     if (fullUrl === window.location.origin + '/' || fullUrl === window.location.origin) return;
 
-                    // Lấy thẻ chứa khung trận đấu
-                    const card = el.closest('div[class*="match"], div[class*="item"], div[class*="game"], div[class*="card"], article') || el.parentElement || el;
-                    const text = card.innerText ? card.innerText.trim() : '';
+                    // Định vị khung chứa thông tin trận đấu
+                    const card = el.closest('.match-item, .item, .card, .game-item, article, [class*="match"], [class*="live"]') || el.parentElement || el;
+                    const text = card.innerText ? card.innerText.trim() : el.innerText.trim();
 
                     if (text.length > 3) {
                         let logo = '';
@@ -124,10 +128,11 @@ def run_scraper():
             for item in raw_matches:
                 url = item['url']
                 text = item['text']
+
                 if url in unique_matches:
                     continue
 
-                if not is_real_match(text, url):
+                if not is_valid_match_url(url, text):
                     continue
 
                 lines = [l.strip() for l in text.split('\n') if l.strip()]
@@ -135,8 +140,8 @@ def run_scraper():
                     continue
 
                 match_title = " - ".join(lines[:2]) if len(lines) >= 2 else lines[0]
-                if len(match_title) > 85:
-                    match_title = match_title[:85] + "..."
+                if len(match_title) > 90:
+                    match_title = match_title[:90] + "..."
 
                 unique_matches[url] = {
                     "title": match_title.replace('\n', ' '),
@@ -147,20 +152,21 @@ def run_scraper():
             match_list = list(unique_matches.values())
             page.close()
 
-            print(f"[*] Tìm thấy {len(match_list)} trận đấu thực tế. Đang tiến hành lấy link m3u8...")
+            print(f"[*] Tìm thấy {len(match_list)} trận đấu trên Phà Lăng TV. Đang bóc tách link m3u8...")
             for idx, match in enumerate(match_list):
-                print(f"[{idx+1}/{len(match_list)}] Lấy link: {match['title']}")
+                print(f"[{idx+1}/{len(match_list)}] Lấy stream: {match['title']}")
                 m3u8_url = get_m3u8_for_match(context, match['url'])
                 match['m3u8_url'] = m3u8_url
 
             final_matches = match_list
 
         except Exception as e:
-            print(f"[!] Lỗi: {e}")
+            print(f"[!] Lỗi khi tải Phà Lăng TV: {e}")
             page.close()
 
         browser.close()
 
+    # Ghi ra file playlist.m3u chuẩn
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n\n")
 
@@ -178,7 +184,7 @@ def run_scraper():
             f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{item["title"]}\n')
             f.write(f'{stream_url}\n\n')
 
-    print(f"[*] Xuất file {OUTPUT_FILE} thành công! Số lượng trận: {len(final_matches)}")
+    print(f"[*] Hoàn tất! Đã xuất {len(final_matches)} trận vào {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     run_scraper()
