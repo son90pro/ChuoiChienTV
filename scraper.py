@@ -1,6 +1,6 @@
 import time
 import re
-from urllib.parse import quote, urlparse
+from urllib.parse import quote
 from playwright.sync_api import sync_playwright
 
 WORKER_DOMAIN = "cctv.sonnguyen90pro.workers.dev"
@@ -10,34 +10,30 @@ OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Chuối Chiên TV"
 DEFAULT_LOGO = "https://raw.githubusercontent.com/iptv-org/iptv/master/logos/sports.png"
 
-# Các từ khóa nhận diện banner quảng cáo, nhà cái hoặc link rác cần loại bỏ tuyệt đối
-ADS_KEYWORDS = [
-    'uk88', 'vin88', 'debet', 'sky88', 'CƯỢC', 'nhà cái', 'casino', 'bet', 
-    'trang chủ chính thức', 'tải app', 'đăng ký', 'khuyến mãi', 'nạp tiền', 
-    'rút tiền', 'hotline', 'hỗ trợ', 'telegram', 'zalo', 'fanpage'
+# Các từ khóa nhận diện link hệ thống, landing, quảng cáo cần loại bỏ tuyệt đối
+IGNORE_PATTERNS = [
+    'landing', 'trang chủ', 'website chính thức', 'lịch •', 'đăng ký', 
+    'khuyến mãi', 'nạp tiền', 'rút tiền', 'uk88', 'vin88', 'debet', 'sky88'
 ]
 
-def is_valid_match_element(text, href):
+def is_match_card(text, href):
     low_text = text.lower()
     low_href = href.lower()
 
-    # Kiểm tra nếu dính từ khóa quảng cáo hoặc nhà cái
-    for kw in ADS_KEYWORDS:
-        if kw in low_text or kw in low_href:
+    # Loại bỏ nếu chứa từ khóa rác hoặc landing page
+    for pat in IGNORE_PATTERNS:
+        if pat in low_text or pat in low_href:
             return False
 
-    # Loại bỏ các link trỏ về trang chủ hoặc neo rác
+    # Loại bỏ link trỏ về chính trang chủ
     if low_href.strip() in [BASE_URL, BASE_URL + "/", "#", "javascript:void(0)"]:
         return False
 
-    # Trận đấu thường phải chứa thời gian (vd: 02:00, 21:45), từ "vs", hoặc các từ chỉ trạng thái trực tiếp
-    has_time = bool(re.search(r'\d{1,2}:\d{2}', text))
-    has_vs = 'vs' in low_text or ' - ' in text or 'trực tiếp' in low_text or 'live' in low_text
+    # Tiêu chuẩn của một trận đấu thường có tên đội, ký hiệu đấu hoặc thời gian trực tiếp
+    has_match_indicator = ('vs' in low_text or ' - ' in text or 'live' in low_text or 
+                           'trực tiếp' in low_text or bool(re.search(r'\d{1,2}:\d{2}', text)))
     
-    if not (has_time or has_vs):
-        return False
-
-    return True
+    return has_match_indicator
 
 def get_m3u8_for_match(context, match_url):
     page = context.new_page()
@@ -82,18 +78,17 @@ def run_scraper():
         try:
             print(f"[*] Đang tải trang chủ: {BASE_URL}")
             page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
-            page.wait_for_timeout(4000)
+            page.wait_for_timeout(5000)
 
-            # Cuộn trang kích hoạt nội dung động
+            # Cuộn trang tối đa để kích hoạt toàn bộ danh sách trận đấu render đầy đủ
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             time.sleep(3)
             page.evaluate("window.scrollTo(0, 0)")
-            time.sleep(1)
+            time.sleep(2)
 
-            # Quét các khối thẻ trận đấu chuẩn xác hơn
+            # Trích xuất toàn bộ liên kết và các thẻ card trận đấu thực tế
             raw_data = page.evaluate('''() => {
                 const results = [];
-                // Tìm các liên kết có khả năng là trận đấu
                 const links = document.querySelectorAll('a[href]');
                 
                 links.forEach(el => {
@@ -102,8 +97,8 @@ def run_scraper():
                     
                     let fullUrl = href.startsWith('http') ? href : window.location.origin + href;
                     
-                    // Lấy khối container chứa thông tin trận đấu
-                    const card = el.closest('div[class*="match"], div[class*="item"], div[class*="game"], div[class*="live"], article') || el.parentElement || el;
+                    // Tìm phần tử bao chứa thông tin trận đấu gần nhất
+                    const card = el.closest('div[class*="match"], div[class*="game"], div[class*="item"], div[class*="live"], article') || el.parentElement || el;
                     const text = card.innerText ? card.innerText.trim() : '';
 
                     let logo = '';
@@ -132,10 +127,10 @@ def run_scraper():
                 if url in unique_matches:
                     continue
 
-                if not is_valid_match_element(text, url):
+                if not is_match_card(text, url):
                     continue
 
-                # Chuẩn hóa tiêu đề trận đấu gọn gàng
+                # Làm sạch và định dạng tên tiêu đề trận đấu
                 lines = [l.strip() for l in text.split('\n') if l.strip()]
                 match_title = " - ".join(lines[:3]) if len(lines) >= 2 else lines[0]
                 if len(match_title) > 90:
@@ -150,9 +145,9 @@ def run_scraper():
             match_list = list(unique_matches.values())
             page.close()
 
-            print(f"[*] Lọc chính xác được {len(match_list)} trận đấu thực tế. Đang quét link m3u8...")
+            print(f"[*] Đã lọc thành công {len(match_list)} trận đấu. Đang tiến hành lấy link m3u8...")
             for idx, match in enumerate(match_list):
-                print(f"[{idx+1}/{len(match_list)}] Lấy link trận: {match['title']}")
+                print(f"[{idx+1}/{len(match_list)}] Lấy link: {match['title']}")
                 m3u8_url = get_m3u8_for_match(context, match['url'])
                 match['m3u8_url'] = m3u8_url
 
@@ -181,7 +176,7 @@ def run_scraper():
             f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{item["title"]}\n')
             f.write(f'{stream_url}\n\n')
 
-    print(f"[*] Xuất file {OUTPUT_FILE} thành công!")
+    print(f"[*] Xuất file {OUTPUT_FILE} hoàn tất!")
 
 if __name__ == "__main__":
     run_scraper()
