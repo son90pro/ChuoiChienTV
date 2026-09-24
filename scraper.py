@@ -9,65 +9,91 @@ BASE_URL = "https://phalang.tv"
 OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Phà Lăng TV"
 
-# Từ khóa menu/trang tĩnh cần lọc bỏ
 EXCLUDE_KEYWORDS = [
     'lịch thi đấu', 'kết quả', 'tin tức', 'bảng xếp hạng', 'soi kèo',
     'nhà cái', 'đăng ký', 'đăng nhập', 'khuyến mãi', 'liên hệ', 'giới thiệu',
     'chính sách', 'hướng dẫn', 'tải app', 'privacy', 'terms'
 ]
 
-# Từ khóa trạng thái rác cần loại khỏi tiêu đề
 STATUS_NOISE = {
     'xem ngay', 'xem trực tiếp', 'trực tiếp', 'sắp diễn ra', 'đang diễn ra', 
     'hiệp 1', 'hiệp 2', 'hết giờ', 'ft', 'ht', 'live', 'hot', 'chi tiết', 'xem'
 }
 
-def clean_match_title(raw_text):
-    """ Bóc tách và định dạng lại tên trận đấu: [Thời gian] Đội A vs Đội B (BLV) """
+KNOWN_LEAGUES = [
+    'friendly', 'cup', 'league', 'championship', 'fifa', 'waff', 'asean', 
+    'asian', 'afc', 'uefa', 'premier', 'la liga', 'serie', 'bundesliga', 'v-league'
+]
+
+def clean_match_title(item):
+    raw_text = item.get('text', '')
+    explicit_blv = item.get('blv', '').strip()
+    
     lines = [l.strip() for l in raw_text.split('\n') if l.strip()]
     
     time_str = ""
-    blv_str = ""
-    other_lines = []
+    blv_str = explicit_blv
+    teams_lines = []
     
     for line in lines:
         l_low = line.lower()
         
-        # Bỏ qua dòng trạng thái rác
+        # Bỏ qua từ rác trạng thái
         if l_low in STATUS_NOISE:
             continue
-        
-        # Nhận diện BLV
-        if 'blv' in l_low or 'bình luận' in l_low:
-            blv_str = line
-        # Nhận diện thời gian (VD: 17:05 hoặc 17:05 24/09)
-        elif re.search(r'\b\d{1,2}:\d{2}\b', line):
-            cleaned_time = re.sub(r'-\s*(Sắp diễn ra|Đang diễn ra|Hết giờ|Trực tiếp).*', '', line, flags=re.IGNORECASE).strip()
-            time_str = cleaned_time
-        else:
-            other_lines.append(line)
             
-    # Ghép các phần lại thành tiêu đề chuẩn
-    title_components = []
-    
-    if time_str:
-        title_components.append(f"[{time_str}]")
-        
-    if other_lines:
-        joined_teams = " ".join(other_lines)
-        joined_teams = re.sub(r'\s+', ' ', joined_teams)
-        title_components.append(joined_teams)
-        
+        # Trích xuất thời gian (VD: 16:00 24/09 hoặc 16:00)
+        time_match = re.search(r'\b\d{1,2}:\d{2}(\s+\d{1,2}/\d{1,2})?\b', line)
+        if time_match and not time_str:
+            time_str = time_match.group(0)
+            continue
+
+        # Trích xuất tên BLV nếu chưa bắt được từ DOM
+        if not blv_str and ('blv' in l_low or 'caster' in l_low or 'bình luận' in l_low or l_low.startswith('lý ')):
+            blv_str = line
+            continue
+
+        # Lọc bỏ tên giải đấu để không bị rối tiêu đề
+        if any(lg in l_low for lg in KNOWN_LEAGUES) and not ('vs' in l_low or 'v/s' in l_low or ' - ' in line):
+            continue
+
+        if blv_str and line.lower() == blv_str.lower():
+            continue
+
+        teams_lines.append(line)
+
+    # Xử lý tên hai đội bóng
+    if len(teams_lines) >= 2:
+        teams_str = f"{teams_lines[0]} vs {teams_lines[1]}"
+    elif len(teams_lines) == 1:
+        teams_str = teams_lines[0]
+        teams_str = re.sub(r'\s+(VS|vs|v/s|-)\s+', ' vs ', teams_str)
+    else:
+        teams_str = "Trận đấu Phà Lăng TV"
+
+    teams_str = re.sub(r'\s+', ' ', teams_str).strip()
+
+    # Định dạng tên BLV (Chuyển thành CHỮ HOA trong ngoặc đơn)
+    formatted_blv = ""
     if blv_str:
-        title_components.append(f"({blv_str})")
+        clean_blv = re.sub(r'^(BLV|Caster|Bình luận viên|BLV:)\s*[:\-]?\s*', '', blv_str, flags=re.IGNORECASE).strip()
+        if clean_blv:
+            formatted_blv = f"({clean_blv.upper()})"
+
+    # Ghép chuỗi chuẩn định dạng: 17:05 24/09 ⚽ Japan vs Uruguay (LÝ LA LÀNG) [geo]
+    parts = []
+    if time_str:
+        parts.append(time_str)
+    
+    parts.append("⚽")
+    parts.append(teams_str)
+    
+    if formatted_blv:
+        parts.append(formatted_blv)
         
-    if not title_components:
-        return "Trận đấu Phà Lăng TV"
-        
-    final_title = " ".join(title_components)
-    if len(final_title) > 95:
-        final_title = final_title[:95] + "..."
-    return final_title
+    parts.append("[geo]")
+
+    return " ".join(parts)
 
 def is_valid_match_url(href, text):
     low_href = href.lower()
@@ -139,32 +165,53 @@ def run_scraper():
 
             raw_matches = page.evaluate('''() => {
                 const matches = [];
-                const links = document.querySelectorAll('a[href]');
+                const cardElements = document.querySelectorAll('a[href], .match-item, .item, .card, .game-item, article, [class*="match"], [class*="item"], [class*="box"]');
 
-                links.forEach(el => {
-                    const href = el.getAttribute('href');
+                cardElements.forEach(card => {
+                    let linkEl = card.tagName === 'A' ? card : card.querySelector('a[href]');
+                    if (!linkEl) return;
+
+                    const href = linkEl.getAttribute('href');
                     if (!href || href === '#' || href.startsWith('javascript')) return;
 
                     const fullUrl = href.startsWith('http') ? href : window.location.origin + href;
-                    
                     if (fullUrl === window.location.origin + '/' || fullUrl === window.location.origin) return;
 
-                    const card = el.closest('.match-item, .item, .card, .game-item, article, [class*="match"], [class*="live"]') || el.parentElement || el;
-                    const text = card.innerText ? card.innerText.trim() : el.innerText.trim();
+                    const container = card.closest('.match-item, .card, .item, [class*="match"]') || card.parentElement || card;
+                    const fullText = container.innerText ? container.innerText.trim() : card.innerText.trim();
 
-                    if (text.length > 3) {
-                        let logo = '';
-                        const img = card.querySelector('img');
-                        if (img) {
-                            let src = img.getAttribute('src') || img.getAttribute('data-src') || '';
-                            if (src && !src.includes('favicon')) {
-                                logo = src.startsWith('http') ? src : window.location.origin + src;
+                    // Tìm thẻ chứa thông tin BLV
+                    let blvText = '';
+                    const blvNode = container.querySelector('[class*="blv"], [class*="comment"], [class*="caster"], [class*="author"], [class*="badge"], .blv, .caster, .commentator');
+                    if (blvNode) {
+                        blvText = blvNode.innerText ? blvNode.innerText.trim() : '';
+                    }
+
+                    if (!blvText) {
+                        const childs = container.querySelectorAll('*');
+                        for (let child of childs) {
+                            const txt = child.innerText ? child.innerText.trim() : '';
+                            if (txt && (txt.toLowerCase().startsWith('blv') || txt.toLowerCase().includes('bình luận'))) {
+                                blvText = txt;
+                                break;
                             }
                         }
+                    }
 
+                    let logo = '';
+                    const img = container.querySelector('img');
+                    if (img) {
+                        let src = img.getAttribute('src') || img.getAttribute('data-src') || '';
+                        if (src && !src.includes('favicon')) {
+                            logo = src.startsWith('http') ? src : window.location.origin + src;
+                        }
+                    }
+
+                    if (fullText.length > 3) {
                         matches.push({
                             url: fullUrl,
-                            text: text,
+                            text: fullText,
+                            blv: blvText,
                             logo: logo
                         });
                     }
@@ -175,15 +222,14 @@ def run_scraper():
             unique_matches = {}
             for item in raw_matches:
                 url = item['url']
-                raw_text = item['text']
 
                 if url in unique_matches:
                     continue
 
-                if not is_valid_match_url(url, raw_text):
+                if not is_valid_match_url(url, item['text']):
                     continue
 
-                formatted_title = clean_match_title(raw_text)
+                formatted_title = clean_match_title(item)
 
                 unique_matches[url] = {
                     "title": formatted_title,
