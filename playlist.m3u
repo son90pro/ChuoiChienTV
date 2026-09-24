@@ -1,22 +1,38 @@
 #EXTM3U
 
-#EXTINF:-1 tvg-logo="https://phalang.live/dp_goal.svg" group-title="Phá Làng TV" , 🟡 17:05 24/09 ⚽ Japan vs Uruguay (LÝ LA LÀNG
-Japan
-1) [geo]
-#EXTVLCOPT:http-referrer=https://phalang.live/
-https://pull.digitalcdn.net/live/9653dc604bb848739a639069c22b94c7/index.m3u8
+#EXTINF:-1 tvg-logo="https://phalang.live/dp_goal.svg" group-title="Phá Làng TV" , 🟡 01:45 25/09 ⚽ Portugal vs Wales (LÝ LA LÀNG
 
-#EXTINF:-1 tvg-logo="https://phalang.live/dp_goal.svg" group-title="Phá Làng TV" , 🟡 17:05 24/09 ⚽ Japan vs Uruguay (LÝ LA LÀNG
-Japan
-1) (HD2) [geo]
+0) [geo]
 #EXTVLCOPT:http-referrer=https://phalang.live/
-https://pull1.digitalcdn.net/live/9653dc604bb848739a639069c22b94c7/index.m3u8
+https://pull.digitalcdn.net/live/d90cc7f2f69445db9c868772e2900e40/index.m3u8
 
-#EXTINF:-1 tvg-logo="https://phalang.live/icons8-football-50.png" group-title="Phá Làng TV" , 🟡 18:00 24/09 ⚽ South Korea vs Ecuador (LÝ LÀNG LÁ) [geo]
-#EXTVLCOPT:http-referrer=https://phalang.live/
-https://pull.digitalcdn.net/live/316ee643fad444f3852aa83941ad9760/index.m3u8
+#EXTINF:-1 tvg-logo="https://phalang.live/dp_goal.svg" group-title="Phá Làng TV" , 🟡 01:45 25/09 ⚽ Portugal vs Wales (LÝ LA LÀNG
 
-#EXTINF:-1 tvg-logo="https://phalang.live/icons8-football-50.png" group-title="Phá Làng TV" , 🟡 18:00 24/09 ⚽ South Korea vs Ecuador (LÝ LÀNG LÁ) (HD2) [geo]
+0) (HD2) [geo]
 #EXTVLCOPT:http-referrer=https://phalang.live/
-https://pull1.digitalcdn.net/live/316ee643fad444f3852aa83941ad9760/index.m3u8
+https://pull1.digitalcdn.net/live/d90cc7f2f69445db9c868772e2900e40/index.m3u8
+
+#EXTINF:-1 tvg-logo="https://phalang.live/icons8-football-50.png" group-title="Phá Làng TV" , 🟡 01:00 25/09 ⚽ Qatar vs Bahrain (LÝ LIỀU LĨNH) [geo]
+#EXTVLCOPT:http-referrer=https://phalang.live/
+https://pull.digitalcdn.net/live/f5d43084054743289f58b324c2ba67d0/index.m3u8
+
+#EXTINF:-1 tvg-logo="https://phalang.live/icons8-football-50.png" group-title="Phá Làng TV" , 🟡 01:00 25/09 ⚽ Qatar vs Bahrain (LÝ LIỀU LĨNH) (HD2) [geo]
+#EXTVLCOPT:http-referrer=https://phalang.live/
+https://pull1.digitalcdn.net/live/f5d43084054743289f58b324c2ba67d0/index.m3u8
+
+#EXTINF:-1 tvg-logo="https://phalang.live/icons8-football-50.png" group-title="Phá Làng TV" , 🟡 01:45 25/09 ⚽ Netherlands vs Germany (LÝ LÀNG LÁ) [geo]
+#EXTVLCOPT:http-referrer=https://phalang.live/
+https://pull.digitalcdn.net/live/4aa36871ec8f40008c77d6becc328b67/index.m3u8
+
+#EXTINF:-1 tvg-logo="https://phalang.live/icons8-football-50.png" group-title="Phá Làng TV" , 🟡 01:45 25/09 ⚽ Netherlands vs Germany (LÝ LÀNG LÁ) (HD2) [geo]
+#EXTVLCOPT:http-referrer=https://phalang.live/
+https://pull1.digitalcdn.net/live/4aa36871ec8f40008c77d6becc328b67/index.m3u8
+
+#EXTINF:-1 tvg-logo="https://phalang.live/icons8-football-50.png" group-title="Phá Làng TV" , 🟡 01:45 25/09 ⚽ Norway vs Denmark (LÝ LONG) [geo]
+#EXTVLCOPT:http-referrer=https://phalang.live/
+https://pull.digitalcdn.net/live/98bf433f993347e7b285d435d02b5399/index.m3u8
+
+#EXTINF:-1 tvg-logo="https://phalang.live/icons8-football-50.png" group-title="Phá Làng TV" , 🟡 01:45 25/09 ⚽ Norway vs Denmark (LÝ LONG) (HD2) [geo]
+#EXTVLCOPT:http-referrer=https://phalang.live/
+https://pull1.digitalcdn.net/live/98bf433f993347e7b285d435d02b5399/index.m3u8
 
