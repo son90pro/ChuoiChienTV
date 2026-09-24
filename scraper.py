@@ -3,9 +3,13 @@ import re
 from urllib.parse import quote
 from playwright.sync_api import sync_playwright
 
+WORKER_DOMAIN = "chuoi-chien-iptv.sonnguyen90pro.workers.dev"
 BASE_URL = "https://phalang.tv"
 OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Phá Làng TV"
+
+# User-Agent chuẩn giả lập trình duyệt Desktop
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
 def get_team_logo_url(team_name: str) -> str:
     """Tra cứu link logo PNG cờ quốc gia chuẩn sắc nét"""
@@ -128,7 +132,7 @@ def run_scraper():
             args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
         )
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            user_agent=USER_AGENT,
             viewport={"width": 1280, "height": 720},
             timezone_id="Asia/Ho_Chi_Minh",
             locale="vi-VN"
@@ -235,17 +239,25 @@ def run_scraper():
         finally:
             browser.close()
 
-    # Xuất trực tiếp link m3u8 hoặc link gốc để TiviMate đọc trực tiếp không qua worker lỗi
+    # Xuất file M3U cấu hình chuẩn Header TiviMate
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n\n")
 
         for item in final_matches:
             logo_attr = f'tvg-logo="{item["logo"]}"' if item["logo"] else ''
             
-            # Ưu tiên lấy trực tiếp link m3u8 bắt được, nếu không có lấy link gốc của trang
-            stream_url = item['m3u8_url'] if item['m3u8_url'] else item['url']
+            if item.get('m3u8_url'):
+                raw_m3u8 = item['m3u8_url']
+                # Thêm pipe Header trực tiếp vào URL cho TiviMate đọc
+                stream_url = f"{raw_m3u8}|Referer={BASE_URL}/&User-Agent={quote(USER_AGENT)}"
+            else:
+                # Chuyển qua Cloudflare Worker /live nếu không bắt được m3u8
+                stream_url = f"https://{WORKER_DOMAIN}/live?url={quote(item['url'], safe='')}"
             
             f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{item["title"]}\n')
+            # Khai báo Header mở rộng TiviMate
+            f.write(f'#EXTVLCOPT:http-user-agent={USER_AGENT}\n')
+            f.write(f'#EXTVLCOPT:http-referrer={BASE_URL}/\n')
             f.write(f'{stream_url}\n\n')
 
     print(f"[*] Đã xuất thành công {len(final_matches)} trận vào {OUTPUT_FILE}")
