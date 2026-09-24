@@ -4,12 +4,12 @@ from urllib.parse import quote
 from playwright.sync_api import sync_playwright
 
 WORKER_DOMAIN = "chuoi-chien-iptv.sonnguyen90pro.workers.dev"
-BASE_URL = "https://phalang.tv" # Hoặc thay bằng https://gavang33.me tùy ý anh Sơn
+BASE_URL = "https://phalang.tv" # Hoặc https://gavang33.me
 OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Phá Làng TV"
 
 def get_team_logo_url(team_name: str) -> str:
-    """Tra cứu link logo PNG cờ quốc gia chuẩn sắc nét"""
+    """Tra cứu link logo PNG cờ quốc gia chuẩn sắc nét hiển thị trên TiviMate"""
     t_lower = team_name.lower().strip()
     logos = {
         "laos": "https://flagcdn.com/w320/la.png",
@@ -29,7 +29,9 @@ def get_team_logo_url(team_name: str) -> str:
         "united arab emirates": "https://flagcdn.com/w320/ae.png",
         "yemen": "https://flagcdn.com/w320/ye.png",
         "vietnam": "https://flagcdn.com/w320/vn.png",
-        "thailand": "https://flagcdn.com/w320/th.png"
+        "thailand": "https://flagcdn.com/w320/th.png",
+        "indonesia": "https://flagcdn.com/w320/id.png",
+        "malaysia": "https://flagcdn.com/w320/my.png"
     }
     for key, url in logos.items():
         if key in t_lower:
@@ -37,7 +39,7 @@ def get_team_logo_url(team_name: str) -> str:
     return "https://flagcdn.com/w320/fk.png"
 
 def parse_teams_from_url(url: str) -> tuple:
-    """Trích xuất tên 2 đội từ URL slug"""
+    """Trích xuất tên 2 đội bóng từ URL slug"""
     try:
         match = re.search(r'/(?:truc-tiep|match|live)/([^/?#]+)', url)
         if not match:
@@ -88,10 +90,8 @@ def get_m3u8_and_details(context, match_url):
     }
 
     try:
-        page.goto(match_url, timeout=15000, wait_until="domcontentloaded")
-        
-        # Chờ tối đa 6 giây để quét gói tin m3u8 phát sinh từ trình phát video ẩn
-        for _ in range(12):
+        page.goto(match_url, timeout=12000, wait_until="domcontentloaded")
+        for _ in range(8):
             if m3u8_found:
                 break
             time.sleep(0.5)
@@ -99,7 +99,6 @@ def get_m3u8_and_details(context, match_url):
         if m3u8_found:
             match_info["m3u8_url"] = m3u8_found[0]
 
-        # Quét thời gian trận đấu trên trang chi tiết
         details = page.evaluate('''() => {
             let tStr = "";
             const timeEls = Array.from(document.querySelectorAll('span, div, p, time, b'));
@@ -186,13 +185,8 @@ def run_scraper():
                 if not text:
                     continue
 
-                print(f"[*] Đang lấy luồng trận [{idx+1}/{len(raw_matches)}]: {url}")
+                print(f"[*] Đang xử lý trận [{idx+1}/{len(raw_matches)}]: {url}")
                 details = get_m3u8_and_details(context, url)
-
-                # QUAN TRỌNG: Nếu không bóc tách được link .m3u8 thì bỏ qua trận này, tránh gây lỗi link hỏng
-                if not details['m3u8_url']:
-                    print(f"[!] Bỏ qua trận chưa có luồng m3u8: {url}")
-                    continue
 
                 # Thời gian
                 raw_time_text = details['time_str'] if details['time_str'] else text
@@ -219,7 +213,7 @@ def run_scraper():
                     team1_name = ""
 
                 logo = get_team_logo_url(team1_name)
-                stream_type = "[geo]" # Hoặc [hls]
+                stream_type = "[geo]"
 
                 blv_suffix = f" ({clean_blv.title()})" if clean_blv else ""
                 full_title = f"{time_str} ⚽ {teams_str}{blv_suffix} {stream_type}".strip()
@@ -231,35 +225,38 @@ def run_scraper():
                     "m3u8_url": details['m3u8_url']
                 })
 
-            # Lọc trùng lặp URL
             unique_dict = {}
             for p_item in parsed_items:
                 if p_item['url'] not in unique_dict:
                     unique_dict[p_item['url']] = p_item
 
             final_matches = list(unique_dict.values())
+            print(f"[*] Tìm thấy tổng cộng {len(final_matches)} trận đấu.")
 
         except Exception as e:
             print(f"[!] Lỗi hệ thống: {e}")
         finally:
             browser.close()
 
-    # Xuất file m3u chỉ với các link m3u8 hợp lệ qua Worker Proxy
+    # Xuất file M3U (Hỗ trợ dự phòng thông minh)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n\n")
 
         for item in final_matches:
             logo_attr = f'tvg-logo="{item["logo"]}"' if item["logo"] else ''
-            encoded_m3u8 = quote(item['m3u8_url'], safe='')
-            encoded_ref = quote(BASE_URL, safe='')
             
-            # Gửi qua worker proxy chuẩn để giải quyết CORS và mã hóa video
-            stream_url = f"https://{WORKER_DOMAIN}/proxy?url={encoded_m3u8}&referer={encoded_ref}"
+            if item.get('m3u8_url'):
+                encoded_m3u8 = quote(item['m3u8_url'], safe='')
+                encoded_ref = quote(BASE_URL, safe='')
+                stream_url = f"https://{WORKER_DOMAIN}/proxy?url={encoded_m3u8}&referer={encoded_ref}"
+            else:
+                # Fallback an toàn qua route /live nếu chưa bắt kịp m3u8
+                stream_url = f"https://{WORKER_DOMAIN}/live?url={quote(item['url'], safe='')}"
             
             f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{item["title"]}\n')
             f.write(f'{stream_url}\n\n')
 
-    print(f"[*] Hoàn tất! Đã xuất {len(final_matches)} luồng hợp lệ vào {OUTPUT_FILE}")
+    print(f"[*] Đã xuất thành công {len(final_matches)} trận vào {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     run_scraper()
