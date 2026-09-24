@@ -1,0 +1,14 @@
+#EXTM3U
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/jp.png" group-title="Phá Làng TV",Trực tiếp ⚽ Japan vs Uruguay
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36
+#EXTVLCOPT:http-referrer=https://phalang.tv/
+#EXTVLCOPT:http-origin=https://phalang.tv
+https://pull.digitalcdn.net/live/9653dc604bb848739a639069c22b94c7/index.m3u8|Referer=https://phalang.tv/&Origin=https://phalang.tv&User-Agent=Mozilla/5.0%20%28Windows%20NT%2010.0%3B%20Win64%3B%20x64%29%20AppleWebKit/537.36%20%28KHTML%2C%20like%20Gecko%29%20Chrome/122.0.0.0%20Safari/537.36
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/la.png" group-title="Phá Làng TV",Trực tiếp ⚽ Laos vs Brunei Darussalam
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36
+#EXTVLCOPT:http-referrer=https://phalang.tv/
+#EXTVLCOPT:http-origin=https://phalang.tv
+https://pull.digitalcdn.net/live/0bd57604023b4412ab92e07727812534/index.m3u8|Referer=https://phalang.tv/&Origin=https://phalang.tv&User-Agent=Mozilla/5.0%20%28Windows%20NT%2010.0%3B%20Win64%3B%20x64%29%20AppleWebKit/537.36%20%28KHTML%2C%20like%20Gecko%29%20Chrome/122.0.0.0%20Safari/537.36
+
