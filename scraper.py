@@ -7,7 +7,7 @@ WORKER_DOMAIN = "cctv.sonnguyen90pro.workers.dev"
 BASE_URL = "https://phalang.tv"
 
 OUTPUT_FILE = "playlist.m3u"
-GROUP_NAME = "Phà Lăng TV"
+GROUP_NAME = "Phá Làng TV"
 
 EXCLUDE_KEYWORDS = [
     'lịch thi đấu', 'kết quả', 'tin tức', 'bảng xếp hạng', 'soi kèo',
@@ -16,7 +16,7 @@ EXCLUDE_KEYWORDS = [
 ]
 
 def parse_teams_from_url(url: str) -> str:
-    """Trích xuất tên 2 đội chính xác từ URL slug, loại bỏ tên giải đấu rác"""
+    """Trích xuất tên 2 đội bóng chính xác từ URL slug"""
     try:
         match = re.search(r'/truc-tiep/([^/?#]+)', url)
         if not match:
@@ -61,7 +61,7 @@ def clean_match_title(item: dict) -> str:
     raw_text = item.get('text', '')
     explicit_blv = item.get('blv', '').strip()
     
-    # 1. Trích xuất tên 2 đội từ URL slug (chính xác 100%)
+    # 1. Trích xuất tên 2 đội từ URL
     teams_str = parse_teams_from_url(url)
     if not teams_str:
         teams_str = "Trận đấu Phà Lăng TV"
@@ -72,7 +72,7 @@ def clean_match_title(item: dict) -> str:
     if time_match:
         time_str = time_match.group(0)
 
-    # 3. Trích xuất tên BLV
+    # 3. Trích xuất tên BLV (nếu có)
     blv_str = explicit_blv
     if not blv_str:
         for line in raw_text.split('\n'):
@@ -90,7 +90,7 @@ def clean_match_title(item: dict) -> str:
         if clean_blv and not re.search(r'\d{1,2}[:/]\d{2}', clean_blv) and len(clean_blv) < 30:
             formatted_blv = f"({clean_blv.upper()})"
 
-    # 4. Ghép hoàn thiện chuỗi
+    # 4. Ghép tiêu đề hiển thị chuẩn
     parts = []
     if time_str:
         parts.append(time_str)
@@ -153,9 +153,12 @@ def run_scraper():
             headless=True,
             args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
         )
+        # Ép trình duyệt dùng múi giờ Việt Nam (Asia/Ho_Chi_Minh)
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            viewport={"width": 1280, "height": 720}
+            viewport={"width": 1280, "height": 720},
+            timezone_id="Asia/Ho_Chi_Minh",
+            locale="vi-VN"
         )
 
         final_matches = []
