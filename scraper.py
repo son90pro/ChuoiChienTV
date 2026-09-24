@@ -10,6 +10,35 @@ OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Chuối Chiên TV"
 DEFAULT_LOGO = "https://raw.githubusercontent.com/iptv-org/iptv/master/logos/sports.png"
 
+# Các từ khóa nhận diện banner quảng cáo, nhà cái hoặc link rác cần loại bỏ tuyệt đối
+ADS_KEYWORDS = [
+    'uk88', 'vin88', 'debet', 'sky88', 'CƯỢC', 'nhà cái', 'casino', 'bet', 
+    'trang chủ chính thức', 'tải app', 'đăng ký', 'khuyến mãi', 'nạp tiền', 
+    'rút tiền', 'hotline', 'hỗ trợ', 'telegram', 'zalo', 'fanpage'
+]
+
+def is_valid_match_element(text, href):
+    low_text = text.lower()
+    low_href = href.lower()
+
+    # Kiểm tra nếu dính từ khóa quảng cáo hoặc nhà cái
+    for kw in ADS_KEYWORDS:
+        if kw in low_text or kw in low_href:
+            return False
+
+    # Loại bỏ các link trỏ về trang chủ hoặc neo rác
+    if low_href.strip() in [BASE_URL, BASE_URL + "/", "#", "javascript:void(0)"]:
+        return False
+
+    # Trận đấu thường phải chứa thời gian (vd: 02:00, 21:45), từ "vs", hoặc các từ chỉ trạng thái trực tiếp
+    has_time = bool(re.search(r'\d{1,2}:\d{2}', text))
+    has_vs = 'vs' in low_text or ' - ' in text or 'trực tiếp' in low_text or 'live' in low_text
+    
+    if not (has_time or has_vs):
+        return False
+
+    return True
+
 def get_m3u8_for_match(context, match_url):
     page = context.new_page()
     page.route("**/*.{png,jpg,jpeg,svg,css,woff,woff2}", lambda route: route.abort())
@@ -55,47 +84,42 @@ def run_scraper():
             page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
             page.wait_for_timeout(4000)
 
-            # Cuộn trang để kích hoạt lazy-load nội dung
+            # Cuộn trang kích hoạt nội dung động
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            time.sleep(2)
+            time.sleep(3)
             page.evaluate("window.scrollTo(0, 0)")
             time.sleep(1)
 
-            # Lấy toàn bộ các khối trận đấu hoặc các link bên trong trang chủ
+            # Quét các khối thẻ trận đấu chuẩn xác hơn
             raw_data = page.evaluate('''() => {
                 const results = [];
-                // Tìm các thẻ a hoặc các khối match thường dùng trên trang trực tiếp bóng đá
-                const elements = document.querySelectorAll('a[href]');
+                // Tìm các liên kết có khả năng là trận đấu
+                const links = document.querySelectorAll('a[href]');
                 
-                elements.forEach(el => {
+                links.forEach(el => {
                     const href = el.getAttribute('href');
-                    if (!href || href === '#' || href.startsWith('javascript') || href.startsWith('tel:')) return;
+                    if (!href) return;
                     
                     let fullUrl = href.startsWith('http') ? href : window.location.origin + href;
                     
-                    // Lọc bỏ các link rác hệ thống thông thường
-                    const lowHref = fullUrl.toLowerCase();
-                    if (lowHref.includes('login') || lowHref.includes('register') || lowHref.includes('terms') || lowHref.includes('privacy')) return;
-
-                    // Tìm thẻ chứa thông tin trận đấu xung quanh
-                    const card = el.closest('div[class*="match"], div[class*="item"], div[class*="card"], article') || el.parentElement || el;
+                    // Lấy khối container chứa thông tin trận đấu
+                    const card = el.closest('div[class*="match"], div[class*="item"], div[class*="game"], div[class*="live"], article') || el.parentElement || el;
                     const text = card.innerText ? card.innerText.trim() : '';
 
-                    if (text.length > 3) {
-                        let logo = '';
-                        const img = card.querySelector('img');
-                        if (img) {
-                            let src = img.getAttribute('src') || img.getAttribute('data-src') || '';
-                            if (src && !src.includes('favicon')) {
-                                logo = src.startsWith('http') ? src : window.location.origin + src;
-                            }
+                    let logo = '';
+                    const img = card.querySelector('img');
+                    if (img) {
+                        let src = img.getAttribute('src') || img.getAttribute('data-src') || '';
+                        if (src && !src.includes('favicon') && !src.includes('logo-site')) {
+                            logo = src.startsWith('http') ? src : window.location.origin + src;
                         }
-                        results.push({
-                            url: fullUrl,
-                            text: text,
-                            logo: logo
-                        });
                     }
+
+                    results.push({
+                        url: fullUrl,
+                        text: text,
+                        logo: logo
+                    });
                 });
                 return results;
             }''')
@@ -108,18 +132,14 @@ def run_scraper():
                 if url in unique_matches:
                     continue
 
-                # Chuẩn hóa tên trận đấu từ đoạn text thu thập được
-                lines = [l.strip() for l in text.split('\n') if l.strip()]
-                
-                # Bỏ qua các mục quá ngắn hoặc không phải trận đấu
-                if len(lines) == 0:
+                if not is_valid_match_element(text, url):
                     continue
 
-                # Lọc lấy các dòng có thông tin đội bóng hoặc giờ giấc
+                # Chuẩn hóa tiêu đề trận đấu gọn gàng
+                lines = [l.strip() for l in text.split('\n') if l.strip()]
                 match_title = " - ".join(lines[:3]) if len(lines) >= 2 else lines[0]
-                # Giới hạn độ dài tiêu đề cho gọn gàng trên tivi
-                if len(match_title) > 80:
-                    match_title = match_title[:80] + "..."
+                if len(match_title) > 90:
+                    match_title = match_title[:90] + "..."
 
                 unique_matches[url] = {
                     "title": match_title.replace('\n', ' '),
@@ -130,9 +150,9 @@ def run_scraper():
             match_list = list(unique_matches.values())
             page.close()
 
-            print(f"[*] Tìm thấy {len(match_list)} mục. Đang quét link stream m3u8...")
+            print(f"[*] Lọc chính xác được {len(match_list)} trận đấu thực tế. Đang quét link m3u8...")
             for idx, match in enumerate(match_list):
-                print(f"[{idx+1}/{len(match_list)}] Đang xử lý: {match['title']}")
+                print(f"[{idx+1}/{len(match_list)}] Lấy link trận: {match['title']}")
                 m3u8_url = get_m3u8_for_match(context, match['url'])
                 match['m3u8_url'] = m3u8_url
 
@@ -161,7 +181,7 @@ def run_scraper():
             f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{item["title"]}\n')
             f.write(f'{stream_url}\n\n')
 
-    print(f"[*] Đã xuất file {OUTPUT_FILE} thành công!")
+    print(f"[*] Xuất file {OUTPUT_FILE} thành công!")
 
 if __name__ == "__main__":
     run_scraper()
