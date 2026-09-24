@@ -17,12 +17,13 @@ EXCLUDE_KEYWORDS = [
 
 STATUS_NOISE = {
     'xem ngay', 'xem trực tiếp', 'trực tiếp', 'sắp diễn ra', 'đang diễn ra', 
-    'hiệp 1', 'hiệp 2', 'hết giờ', 'ft', 'ht', 'live', 'hot', 'chi tiết', 'xem'
+    'hiệp 1', 'hiệp 2', 'hết giờ', 'ft', 'ht', 'live', 'hot', 'chi tiết', 'xem',
+    'vs', 'v/s', '-', '–'
 }
 
 KNOWN_LEAGUES = [
     'friendly', 'cup', 'league', 'championship', 'fifa', 'waff', 'asean', 
-    'asian', 'afc', 'uefa', 'premier', 'la liga', 'serie', 'bundesliga', 'v-league'
+    'asian', 'afc', 'uefa', 'premier', 'la liga', 'serie', 'bundesliga', 'v-league', 'international'
 ]
 
 def clean_match_title(item):
@@ -33,54 +34,77 @@ def clean_match_title(item):
     
     time_str = ""
     blv_str = explicit_blv
-    teams_lines = []
+    cleaned_lines = []
     
+    # 1. Bóc tách Thời gian, BLV và loại bỏ các dòng rác
     for line in lines:
         l_low = line.lower()
         
-        # Bỏ qua từ rác trạng thái
         if l_low in STATUS_NOISE:
             continue
             
-        # Trích xuất thời gian (VD: 16:00 24/09 hoặc 16:00)
+        # Trích xuất thời gian (VD: 17:05 24/09)
         time_match = re.search(r'\b\d{1,2}:\d{2}(\s+\d{1,2}/\d{1,2})?\b', line)
         if time_match and not time_str:
             time_str = time_match.group(0)
             continue
 
-        # Trích xuất tên BLV nếu chưa bắt được từ DOM
-        if not blv_str and ('blv' in l_low or 'caster' in l_low or 'bình luận' in l_low or l_low.startswith('lý ')):
-            blv_str = line
-            continue
-
-        # Lọc bỏ tên giải đấu để không bị rối tiêu đề
-        if any(lg in l_low for lg in KNOWN_LEAGUES) and not ('vs' in l_low or 'v/s' in l_low or ' - ' in line):
-            continue
+        # Trích xuất tên BLV (nhận diện qua chữ 'blv', 'caster', 'bình luận' hoặc họ 'lý ')
+        if not blv_str:
+            if any(k in l_low for k in ['blv', 'caster', 'bình luận', 'lý ']):
+                blv_str = line
+                continue
+            elif line.startswith('(') and line.endswith(')'):
+                blv_str = line.strip('()')
+                continue
 
         if blv_str and line.lower() == blv_str.lower():
             continue
 
-        teams_lines.append(line)
+        # Bỏ dòng chứa tên giải đấu riêng biệt
+        if any(lg in l_low for lg in KNOWN_LEAGUES) and not re.search(r'\b(vs|v/s|-)\b', l_low, re.I):
+            continue
 
-    # Xử lý tên hai đội bóng
+        cleaned_lines.append(line)
+
+    # 2. Lọc lại danh sách các dòng tên đội bóng
+    teams_lines = [l for l in cleaned_lines if l.lower() not in ['vs', 'v/s', '-', '–', '']]
+
+    # Nếu chưa tìm thấy BLV, kiểm tra dòng cuối cùng
+    if not blv_str and teams_lines:
+        last_line = teams_lines[-1]
+        if 'lý ' in last_line.lower() or 'blv' in last_line.lower():
+            blv_str = last_line
+            teams_lines.pop()
+
+    # 3. Ghép tên hai đội bóng
     if len(teams_lines) >= 2:
-        teams_str = f"{teams_lines[0]} vs {teams_lines[1]}"
+        team1 = teams_lines[0]
+        team2 = teams_lines[1]
+        team1 = re.sub(r'\s+(vs|VS|v/s|-)\s*$', '', team1).strip()
+        team2 = re.sub(r'^\s*(vs|VS|v/s|-)\s+', '', team2).strip()
+        teams_str = f"{team1} vs {team2}"
     elif len(teams_lines) == 1:
         teams_str = teams_lines[0]
         teams_str = re.sub(r'\s+(VS|vs|v/s|-)\s+', ' vs ', teams_str)
+        teams_str = re.sub(r'\s+(VS|vs|v/s|-)\s*$', '', teams_str)
     else:
         teams_str = "Trận đấu Phà Lăng TV"
 
-    teams_str = re.sub(r'\s+', ' ', teams_str).strip()
+    # Làm sạch triệt để lỗi đuôi "vs VS"
+    teams_str = re.sub(r'\s+vs\s+VS\b', ' vs', teams_str, flags=re.I)
+    teams_str = re.sub(r'\s+VS\s*$', '', teams_str, flags=re.I)
+    teams_str = re.sub(r'\s+vs\s*$', '', teams_str, flags=re.I).strip()
 
-    # Định dạng tên BLV (Chuyển thành CHỮ HOA trong ngoặc đơn)
+    # 4. Định dạng chữ hoa cho tên BLV
     formatted_blv = ""
     if blv_str:
         clean_blv = re.sub(r'^(BLV|Caster|Bình luận viên|BLV:)\s*[:\-]?\s*', '', blv_str, flags=re.IGNORECASE).strip()
+        clean_blv = clean_blv.strip('()[]')
         if clean_blv:
             formatted_blv = f"({clean_blv.upper()})"
 
-    # Ghép chuỗi chuẩn định dạng: 17:05 24/09 ⚽ Japan vs Uruguay (LÝ LA LÀNG) [geo]
+    # 5. Ghép chuẩn mẫu: [Giờ Ngày] ⚽ [Đội 1 vs Đội 2] ([TÊN BLV]) [geo]
     parts = []
     if time_str:
         parts.append(time_str)
@@ -180,7 +204,6 @@ def run_scraper():
                     const container = card.closest('.match-item, .card, .item, [class*="match"]') || card.parentElement || card;
                     const fullText = container.innerText ? container.innerText.trim() : card.innerText.trim();
 
-                    // Tìm thẻ chứa thông tin BLV
                     let blvText = '';
                     const blvNode = container.querySelector('[class*="blv"], [class*="comment"], [class*="caster"], [class*="author"], [class*="badge"], .blv, .caster, .commentator');
                     if (blvNode) {
@@ -191,7 +214,7 @@ def run_scraper():
                         const childs = container.querySelectorAll('*');
                         for (let child of childs) {
                             const txt = child.innerText ? child.innerText.trim() : '';
-                            if (txt && (txt.toLowerCase().startsWith('blv') || txt.toLowerCase().includes('bình luận'))) {
+                            if (txt && (txt.toLowerCase().startsWith('blv') || txt.toLowerCase().includes('bình luận') || txt.toLowerCase().startsWith('lý '))) {
                                 blvText = txt;
                                 break;
                             }
