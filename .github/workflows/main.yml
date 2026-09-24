@@ -2,8 +2,9 @@ name: Auto Scrape M3U Playlist - Chuoi Chien TV
 
 on:
   schedule:
-    - cron: '0 */2 * * *'
-  workflow_dispatch:
+    # Tự động chạy mỗi 1 tiếng một lần (Cron theo giờ UTC)
+    - cron: '0 * * * *'
+  workflow_dispatch: # Giữ lại nút bấm thủ công khi muốn test ngay
 
 permissions:
   contents: write
