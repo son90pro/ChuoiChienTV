@@ -16,16 +16,67 @@ EXCLUDE_KEYWORDS = [
     'chính sách', 'hướng dẫn', 'tải app', 'privacy', 'terms'
 ]
 
+# Từ khóa trạng thái rác cần loại khỏi tiêu đề
+STATUS_NOISE = {
+    'xem ngay', 'xem trực tiếp', 'trực tiếp', 'sắp diễn ra', 'đang diễn ra', 
+    'hiệp 1', 'hiệp 2', 'hết giờ', 'ft', 'ht', 'live', 'hot', 'chi tiết', 'xem'
+}
+
+def clean_match_title(raw_text):
+    """ Bóc tách và định dạng lại tên trận đấu: [Thời gian] Đội A vs Đội B (BLV) """
+    lines = [l.strip() for l in raw_text.split('\n') if l.strip()]
+    
+    time_str = ""
+    blv_str = ""
+    other_lines = []
+    
+    for line in lines:
+        l_low = line.lower()
+        
+        # Bỏ qua dòng trạng thái rác
+        if l_low in STATUS_NOISE:
+            continue
+        
+        # Nhận diện BLV
+        if 'blv' in l_low or 'bình luận' in l_low:
+            blv_str = line
+        # Nhận diện thời gian (VD: 17:05 hoặc 17:05 24/09)
+        elif re.search(r'\b\d{1,2}:\d{2}\b', line):
+            cleaned_time = re.sub(r'-\s*(Sắp diễn ra|Đang diễn ra|Hết giờ|Trực tiếp).*', '', line, flags=re.IGNORECASE).strip()
+            time_str = cleaned_time
+        else:
+            other_lines.append(line)
+            
+    # Ghép các phần lại thành tiêu đề chuẩn
+    title_components = []
+    
+    if time_str:
+        title_components.append(f"[{time_str}]")
+        
+    if other_lines:
+        joined_teams = " ".join(other_lines)
+        joined_teams = re.sub(r'\s+', ' ', joined_teams)
+        title_components.append(joined_teams)
+        
+    if blv_str:
+        title_components.append(f"({blv_str})")
+        
+    if not title_components:
+        return "Trận đấu Phà Lăng TV"
+        
+    final_title = " ".join(title_components)
+    if len(final_title) > 95:
+        final_title = final_title[:95] + "..."
+    return final_title
+
 def is_valid_match_url(href, text):
     low_href = href.lower()
     low_text = text.lower()
 
-    # Bỏ qua các mục menu
     for kw in EXCLUDE_KEYWORDS:
         if kw in low_text or kw.replace(' ', '-') in low_href:
             return False
 
-    # Bỏ qua link trang chủ hoặc anchor rỗng
     if low_href.strip() in [BASE_URL.lower(), BASE_URL.lower() + "/", "#", "javascript:void(0)"]:
         return False
 
@@ -36,7 +87,6 @@ def is_valid_match_url(href, text):
 
 def get_m3u8_for_match(context, match_url):
     page = context.new_page()
-    # Chặn ảnh và font để tăng tốc độ tải trang
     page.route("**/*.{png,jpg,jpeg,svg,css,woff,woff2}", lambda route: route.abort())
     
     m3u8_found = []
@@ -76,11 +126,10 @@ def run_scraper():
         page = context.new_page()
 
         try:
-            print(f"[*] Đang tải trang chủ Phà Lăng TV: {BASE_URL}")
+            print(f"[*] Đang tải trang Phà Lăng TV: {BASE_URL}")
             page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
             page.wait_for_timeout(4000)
 
-            # Cuộn trang để hiển thị đầy đủ các trận đấu
             page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
             time.sleep(2)
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -100,7 +149,6 @@ def run_scraper():
                     
                     if (fullUrl === window.location.origin + '/' || fullUrl === window.location.origin) return;
 
-                    // Định vị khung chứa thông tin trận đấu
                     const card = el.closest('.match-item, .item, .card, .game-item, article, [class*="match"], [class*="live"]') || el.parentElement || el;
                     const text = card.innerText ? card.innerText.trim() : el.innerText.trim();
 
@@ -127,24 +175,18 @@ def run_scraper():
             unique_matches = {}
             for item in raw_matches:
                 url = item['url']
-                text = item['text']
+                raw_text = item['text']
 
                 if url in unique_matches:
                     continue
 
-                if not is_valid_match_url(url, text):
+                if not is_valid_match_url(url, raw_text):
                     continue
 
-                lines = [l.strip() for l in text.split('\n') if l.strip()]
-                if not lines:
-                    continue
-
-                match_title = " - ".join(lines[:2]) if len(lines) >= 2 else lines[0]
-                if len(match_title) > 90:
-                    match_title = match_title[:90] + "..."
+                formatted_title = clean_match_title(raw_text)
 
                 unique_matches[url] = {
-                    "title": match_title.replace('\n', ' '),
+                    "title": formatted_title,
                     "logo": item['logo'],
                     "url": url
                 }
@@ -152,7 +194,7 @@ def run_scraper():
             match_list = list(unique_matches.values())
             page.close()
 
-            print(f"[*] Tìm thấy {len(match_list)} trận đấu trên Phà Lăng TV. Đang bóc tách link m3u8...")
+            print(f"[*] Tìm thấy {len(match_list)} trận đấu trên Phà Lăng TV. Đang trích xuất link stream...")
             for idx, match in enumerate(match_list):
                 print(f"[{idx+1}/{len(match_list)}] Lấy stream: {match['title']}")
                 m3u8_url = get_m3u8_for_match(context, match['url'])
@@ -161,12 +203,11 @@ def run_scraper():
             final_matches = match_list
 
         except Exception as e:
-            print(f"[!] Lỗi khi tải Phà Lăng TV: {e}")
+            print(f"[!] Lỗi: {e}")
             page.close()
 
         browser.close()
 
-    # Ghi ra file playlist.m3u chuẩn
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n\n")
 
