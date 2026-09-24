@@ -15,6 +15,14 @@ EXCLUDE_KEYWORDS = [
     'chính sách', 'hướng dẫn', 'tải app', 'privacy', 'terms'
 ]
 
+# Danh sách lọc sạch tên giải đấu rác
+LEAGUE_KEYWORDS = [
+    'friendly', 'cup', 'league', 'championship', 'fifa', 'waff', 'asean', 
+    'asian', 'afc', 'uefa', 'premier', 'la liga', 'serie', 'bundesliga', 
+    'v-league', 'international', 'gulf', 'arabian', 'world cup', 'euro',
+    'cúp', 'giải', 'giao hữu', 'phà lăng', 'nations', 'copa', 'champions'
+]
+
 STATUS_NOISE = {
     'xem ngay', 'xem trực tiếp', 'trực tiếp', 'sắp diễn ra', 'đang diễn ra', 
     'hiệp 1', 'hiệp 2', 'hết giờ', 'ft', 'ht', 'live', 'hot', 'chi tiết', 'xem',
@@ -30,11 +38,10 @@ def clean_match_title(item):
     time_str = ""
     blv_str = explicit_blv
     
-    # 1. Trích xuất thời gian và lọc bỏ các từ rác trạng thái
-    clean_lines = []
+    # 1. Trích xuất thời gian
+    filtered_lines = []
     for line in lines:
         l_low = line.lower()
-        
         if l_low in STATUS_NOISE:
             continue
             
@@ -42,45 +49,57 @@ def clean_match_title(item):
         if time_match and not time_str:
             time_str = time_match.group(0)
             rest = line.replace(time_match.group(0), '').strip()
-            if rest:
-                clean_lines.append(rest)
+            if rest and rest.lower() not in STATUS_NOISE:
+                filtered_lines.append(rest)
             continue
             
-        clean_lines.append(line)
+        filtered_lines.append(line)
 
-    # 2. Tìm tên BLV trong danh sách các dòng nếu chưa bắt được từ DOM
-    if not blv_str:
-        for i, line in enumerate(list(clean_lines)):
-            l_low = line.lower()
-            if any(k in l_low for k in ['blv', 'caster', 'bình luận']) or l_low.startswith('lý ') or l_low.startswith('ly '):
-                blv_str = line
-                clean_lines.pop(i)
-                break
-
-    # Nếu vẫn chưa tìm thấy BLV và còn dòng thừa (không chứa chữ 'vs')
-    if not blv_str and len(clean_lines) >= 2:
-        last_line = clean_lines[-1]
-        if not re.search(r'\b(vs|v/s)\b', last_line, re.I) and len(last_line) < 30:
-            blv_str = last_line
-            clean_lines.pop()
-
-    # 3. Trích xuất tên hai đội bóng
-    if len(clean_lines) >= 2:
-        vs_line = next((l for l in clean_lines if re.search(r'\b(vs|v/s)\b', l, re.I)), None)
-        if vs_line:
-            teams_str = vs_line
+    # 2. Tìm tên BLV (nhận diện qua 'blv', 'caster', 'bình luận' hoặc họ 'Lý '/'Ly ')
+    remaining_lines = []
+    for line in filtered_lines:
+        l_low = line.lower()
+        if not blv_str and (any(k in l_low for k in ['blv', 'caster', 'bình luận']) or l_low.startswith('lý ') or l_low.startswith('ly ')):
+            blv_str = line
         else:
-            teams_str = f"{clean_lines[0]} vs {clean_lines[1]}"
-    elif len(clean_lines) == 1:
-        teams_str = clean_lines[0]
+            remaining_lines.append(line)
+
+    # 3. Loại bỏ tên Giải đấu khỏi tên đội bóng
+    candidate_lines = []
+    for line in remaining_lines:
+        l_low = line.lower()
+        if any(lg in l_low for lg in LEAGUE_KEYWORDS) and not re.search(r'\b(vs|v/s)\b', l_low, re.I):
+            continue
+        candidate_lines.append(line)
+
+    # 4. Phân tách Đội 1 vs Đội 2
+    teams_str = ""
+    vs_line = next((l for l in candidate_lines if re.search(r'\b(vs|v/s)\b', l, re.I)), None)
+    
+    if vs_line:
+        teams_str = vs_line
+        rem = [l for l in candidate_lines if l != vs_line]
+        if rem and not blv_str:
+            blv_str = rem[0]
     else:
-        teams_str = "Trận đấu Phà Lăng TV"
+        if len(candidate_lines) >= 3:
+            teams_str = f"{candidate_lines[0]} vs {candidate_lines[1]}"
+            if not blv_str:
+                blv_str = candidate_lines[2]
+        elif len(candidate_lines) == 2:
+            teams_str = f"{candidate_lines[0]} vs {candidate_lines[1]}"
+        elif len(candidate_lines) == 1:
+            teams_str = candidate_lines[0]
+        else:
+            teams_str = "Trận đấu Phà Lăng TV"
 
-    # Làm sạch tên đội bóng
+    # Làm sạch chuỗi tên đội bóng
     teams_str = re.sub(r'\s+', ' ', teams_str).strip()
-    teams_str = re.sub(r'\s+(VS|vs|v/s|-)\s+', ' vs ', teams_str)
+    teams_str = re.sub(r'\s+(VS|vs|v/s|-)\s+', ' vs ', teams_str, flags=re.I)
+    teams_str = re.sub(r'^\s*(vs|v/s|-)\s+', '', teams_str, flags=re.I)
+    teams_str = re.sub(r'\s+(vs|v/s|-)\s*$', '', teams_str, flags=re.I)
 
-    # 4. Định dạng chữ HOA cho tên BLV nằm trong ngoặc đơn
+    # 5. Định dạng tên BLV chữ HOA trong ngoặc đơn: (LÝ LA LÀNG)
     formatted_blv = ""
     if blv_str:
         clean_blv = re.sub(r'^(BLV|Caster|Bình luận viên|BLV:)\s*[:\-]?\s*', '', blv_str, flags=re.IGNORECASE).strip()
@@ -88,7 +107,7 @@ def clean_match_title(item):
         if clean_blv:
             formatted_blv = f"({clean_blv.upper()})"
 
-    # 5. Ghép đúng định dạng: [Giờ Ngày] ⚽ [Đội 1 vs Đội 2] ([TÊN BLV]) [geo]
+    # 6. Ghép đúng chuẩn mẫu ảnh: 17:05 24/09 ⚽ Japan vs Uruguay (LÝ LA LÀNG) [geo]
     parts = []
     if time_str:
         parts.append(time_str)
@@ -164,7 +183,6 @@ def run_scraper():
             page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
             page.wait_for_timeout(5000)
 
-            # Cuộn trang để kích hoạt toàn bộ thẻ trận đấu
             page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
             time.sleep(2)
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -172,7 +190,6 @@ def run_scraper():
             page.evaluate("window.scrollTo(0, 0)")
             time.sleep(1)
 
-            # Lấy chi tiết thông tin trận đấu và BLV từ DOM
             raw_matches = page.evaluate('''() => {
                 const matches = [];
                 const links = document.querySelectorAll('a[href]');
@@ -184,28 +201,15 @@ def run_scraper():
                     const fullUrl = href.startsWith('http') ? href : window.location.origin + href;
                     if (fullUrl === window.location.origin + '/' || fullUrl === window.location.origin) return;
 
-                    // Xác định khung trận đấu (container)
-                    const container = el.closest('.match-item, .item, .card, .game-item, article, [class*="match"], [class*="item"], [class*="card"]') || el.parentElement;
+                    const container = el.closest('.match-item, .item, .card, .game-item, article, [class*="match"], [class*="item"]') || el.parentElement || el;
                     if (!container) return;
 
                     const fullText = container.innerText ? container.innerText.trim() : '';
 
-                    // Quét riêng thẻ chứa BLV
                     let blvText = '';
-                    const blvNode = container.querySelector('[class*="blv"], [class*="caster"], [class*="comment"], [class*="author"], [class*="badge"], .blv, .caster, .commentator');
+                    const blvNode = container.querySelector('[class*="blv"], [class*="caster"], [class*="comment"], [class*="author"], .blv, .caster, .commentator');
                     if (blvNode) {
                         blvText = blvNode.innerText ? blvNode.innerText.trim() : '';
-                    }
-
-                    if (!blvText) {
-                        const childs = container.querySelectorAll('*');
-                        for (let child of childs) {
-                            const txt = child.innerText ? child.innerText.trim() : '';
-                            if (txt && (txt.toLowerCase().startsWith('lý ') || txt.toLowerCase().startsWith('ly ') || txt.toLowerCase().includes('blv'))) {
-                                blvText = txt;
-                                break;
-                            }
-                        }
                     }
 
                     let logo = '';
