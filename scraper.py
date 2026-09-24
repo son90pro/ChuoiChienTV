@@ -3,16 +3,14 @@ import re
 from urllib.parse import quote
 from playwright.sync_api import sync_playwright
 
-WORKER_DOMAIN = "chuoi-chien-iptv.sonnguyen90pro.workers.dev"
 BASE_URL = "https://phalang.tv"
 OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Phá Làng TV"
 
-# User-Agent chuẩn giả lập trình duyệt Desktop
+# User-Agent ngụy trang thành trình duyệt Chrome trên máy tính
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
 def get_team_logo_url(team_name: str) -> str:
-    """Tra cứu link logo PNG cờ quốc gia chuẩn sắc nét"""
     t_lower = team_name.lower().strip()
     logos = {
         "laos": "https://flagcdn.com/w320/la.png",
@@ -42,7 +40,6 @@ def get_team_logo_url(team_name: str) -> str:
     return "https://flagcdn.com/w320/fk.png"
 
 def parse_teams_from_url(url: str) -> tuple:
-    """Trích xuất tên 2 đội bóng từ URL slug"""
     try:
         match = re.search(r'/(?:truc-tiep|match|live)/([^/?#]+)', url)
         if not match:
@@ -77,14 +74,14 @@ def parse_teams_from_url(url: str) -> tuple:
 
 def get_m3u8_and_details(context, match_url):
     page = context.new_page()
-    page.route("**/*.{png,jpg,jpeg,svg,css,woff,woff2}", lambda route: route.abort())
+    page.route("**/*.{png,jpg,jpeg,svg,css,woff,woff2,gif}", lambda route: route.abort())
     
-    m3u8_found = []
+    m3u8_list = []
     def handle_request(request):
         url = request.url
         if ".m3u8" in url and "blob:" not in url:
-            if url not in m3u8_found:
-                m3u8_found.append(url)
+            m3u8_list.append(url)
+            
     page.on("request", handle_request)
 
     match_info = {
@@ -93,14 +90,18 @@ def get_m3u8_and_details(context, match_url):
     }
 
     try:
-        page.goto(match_url, timeout=12000, wait_until="domcontentloaded")
-        for _ in range(10):
-            if m3u8_found:
+        page.goto(match_url, timeout=15000, wait_until="domcontentloaded")
+        
+        # Đợi tối đa 10 giây để thu thập tất cả các luồng m3u8
+        # Các trang này thường load link lỗi mồi trước, link thật load sau
+        for _ in range(20):
+            if len(m3u8_list) >= 2: 
                 break
             time.sleep(0.5)
             
-        if m3u8_found:
-            match_info["m3u8_url"] = m3u8_found[0]
+        if m3u8_list:
+            # Luôn lấy link m3u8 bắt được cuối cùng để né quảng cáo/link mồi
+            match_info["m3u8_url"] = m3u8_list[-1]
 
         details = page.evaluate('''() => {
             let tStr = "";
@@ -188,6 +189,7 @@ def run_scraper():
                 if not text:
                     continue
 
+                print(f"[*] Đang xử lý trận [{idx+1}/{len(raw_matches)}]: {url}")
                 details = get_m3u8_and_details(context, url)
 
                 # Thời gian
@@ -239,7 +241,7 @@ def run_scraper():
         finally:
             browser.close()
 
-    # Xuất file M3U cấu hình chuẩn Header TiviMate
+    # Xuất file M3U ép nhận diện giả lập trình duyệt 100%
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n\n")
 
@@ -248,16 +250,16 @@ def run_scraper():
             
             if item.get('m3u8_url'):
                 raw_m3u8 = item['m3u8_url']
-                # Thêm pipe Header trực tiếp vào URL cho TiviMate đọc
-                stream_url = f"{raw_m3u8}|Referer={BASE_URL}/&User-Agent={quote(USER_AGENT)}"
+                # Bơm đầy đủ Origin, Referer và User-Agent qua cú pháp Pipe của TiviMate
+                stream_url = f"{raw_m3u8}|Origin={BASE_URL}&Referer={BASE_URL}/&User-Agent={quote(USER_AGENT)}"
             else:
-                # Chuyển qua Cloudflare Worker /live nếu không bắt được m3u8
-                stream_url = f"https://{WORKER_DOMAIN}/live?url={quote(item['url'], safe='')}"
+                stream_url = item['url']
             
             f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{item["title"]}\n')
-            # Khai báo Header mở rộng TiviMate
+            # Thêm Header bổ trợ cho các player khác TiviMate
             f.write(f'#EXTVLCOPT:http-user-agent={USER_AGENT}\n')
             f.write(f'#EXTVLCOPT:http-referrer={BASE_URL}/\n')
+            f.write(f'#EXTVLCOPT:http-origin={BASE_URL}\n')
             f.write(f'{stream_url}\n\n')
 
     print(f"[*] Đã xuất thành công {len(final_matches)} trận vào {OUTPUT_FILE}")
