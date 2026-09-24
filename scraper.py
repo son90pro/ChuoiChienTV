@@ -8,37 +8,31 @@ BASE_URL = "https://live07.chuoichientv.me"
 
 OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Chuối Chiên TV"
-DEFAULT_LOGO = "https://raw.githubusercontent.com/iptv-org/iptv/master/logos/sports.png"
 
-# Các từ khóa của menu hệ thống, kết quả, lịch thi đấu cần loại bỏ tuyệt đối
+# Danh sách từ khóa menu hệ thống cần loại bỏ
 EXCLUDE_KEYWORDS = [
     'lịch thi đấu', 'kết quả', 'tin thể thao', 'top nhà cái', 'đăng nhập', 
     'trang chủ', 'tải app', 'khuyến mãi', 'nạp tiền', 'rút tiền', 'bảng xếp hạng',
-    'trang chủ chính thức', 'landing'
+    'trang chủ chính thức', 'landing', 'chính sách', 'giới thiệu', 'liên hệ'
 ]
 
 def is_real_match(text, href):
     low_text = text.lower()
     low_href = href.lower()
 
-    # Kiểm tra nếu dính từ khóa menu hệ thống hoặc rác
+    # Bỏ các link chứa từ khóa menu
     for kw in EXCLUDE_KEYWORDS:
         if kw in low_text:
             return False
 
-    # Loại bỏ link trỏ về trang chủ hoặc neo rỗng
-    if low_href.strip() in [BASE_URL, BASE_URL + "/", "#", "javascript:void(0)"]:
+    # Bỏ link trang chủ hoặc anchor rỗng
+    if low_href.strip() in [BASE_URL.lower(), BASE_URL.lower() + "/", "#", "javascript:void(0)"]:
         return False
 
-    # Trận đấu thực tế phải có từ khóa hiệp đấu, thời gian trực tiếp, dấu vs, hoặc tên giải đấu/đội bóng
-    has_match_sign = (
-        'hiệp' in low_text or 'vs' in low_text or 'live' in low_text or 
-        'trực tiếp' in low_text or ' - ' in text or 
-        bool(re.search(r'\d{1,2}:\d{2}', text)) or
-        bool(re.search(r'(vđqg|premier|la liga|serie a|bundesliga|champions|cup|cúp|anh|tây ban nha|ý|đức|pháp|việt nam)', low_text))
-    )
+    if any(k in low_href for k in ['/lich-thi-dau', '/ket-qua', '/tin-tuc', '/top-nha-cai', '/dang-nhap']):
+        return False
 
-    return has_match_sign
+    return True
 
 def get_m3u8_for_match(context, match_url):
     page = context.new_page()
@@ -85,7 +79,6 @@ def run_scraper():
             page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
             page.wait_for_timeout(4000)
 
-            # Cuộn trang để hiển thị đầy đủ danh sách trận đấu động
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             time.sleep(3)
             page.evaluate("window.scrollTo(0, 0)")
@@ -103,11 +96,11 @@ def run_scraper():
                     
                     if (fullUrl === window.location.origin + '/' || fullUrl === window.location.origin) return;
 
-                    # Lấy khung chứa thông tin trận đấu
+                    // Lấy thẻ chứa khung trận đấu
                     const card = el.closest('div[class*="match"], div[class*="item"], div[class*="game"], div[class*="card"], article') || el.parentElement || el;
                     const text = card.innerText ? card.innerText.trim() : '';
 
-                    if (text.length > 5) {
+                    if (text.length > 3) {
                         let logo = '';
                         const img = card.querySelector('img');
                         if (img) {
@@ -154,7 +147,7 @@ def run_scraper():
             match_list = list(unique_matches.values())
             page.close()
 
-            print(f"[*] Lọc chính xác {len(match_list)} trận đấu thực tế. Đang lấy link m3u8...")
+            print(f"[*] Tìm thấy {len(match_list)} trận đấu thực tế. Đang tiến hành lấy link m3u8...")
             for idx, match in enumerate(match_list):
                 print(f"[{idx+1}/{len(match_list)}] Lấy link: {match['title']}")
                 m3u8_url = get_m3u8_for_match(context, match['url'])
@@ -185,7 +178,7 @@ def run_scraper():
             f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{item["title"]}\n')
             f.write(f'{stream_url}\n\n')
 
-    print(f"[*] Xuất file {OUTPUT_FILE} thành công!")
+    print(f"[*] Xuất file {OUTPUT_FILE} thành công! Số lượng trận: {len(final_matches)}")
 
 if __name__ == "__main__":
     run_scraper()
