@@ -3,13 +3,12 @@ import re
 from urllib.parse import quote
 from playwright.sync_api import sync_playwright
 
-WORKER_DOMAIN = "chuoi-chien-iptv.sonnguyen90pro.workers.dev"
-BASE_URL = "https://phalang.tv" # Hoặc https://gavang33.me
+BASE_URL = "https://phalang.tv"
 OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Phá Làng TV"
 
 def get_team_logo_url(team_name: str) -> str:
-    """Tra cứu link logo PNG cờ quốc gia chuẩn sắc nét hiển thị trên TiviMate"""
+    """Tra cứu link logo PNG cờ quốc gia chuẩn sắc nét"""
     t_lower = team_name.lower().strip()
     logos = {
         "laos": "https://flagcdn.com/w320/la.png",
@@ -91,7 +90,7 @@ def get_m3u8_and_details(context, match_url):
 
     try:
         page.goto(match_url, timeout=12000, wait_until="domcontentloaded")
-        for _ in range(8):
+        for _ in range(10):
             if m3u8_found:
                 break
             time.sleep(0.5)
@@ -185,7 +184,6 @@ def run_scraper():
                 if not text:
                     continue
 
-                print(f"[*] Đang xử lý trận [{idx+1}/{len(raw_matches)}]: {url}")
                 details = get_m3u8_and_details(context, url)
 
                 # Thời gian
@@ -231,27 +229,21 @@ def run_scraper():
                     unique_dict[p_item['url']] = p_item
 
             final_matches = list(unique_dict.values())
-            print(f"[*] Tìm thấy tổng cộng {len(final_matches)} trận đấu.")
 
         except Exception as e:
             print(f"[!] Lỗi hệ thống: {e}")
         finally:
             browser.close()
 
-    # Xuất file M3U (Hỗ trợ dự phòng thông minh)
+    # Xuất trực tiếp link m3u8 hoặc link gốc để TiviMate đọc trực tiếp không qua worker lỗi
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n\n")
 
         for item in final_matches:
             logo_attr = f'tvg-logo="{item["logo"]}"' if item["logo"] else ''
             
-            if item.get('m3u8_url'):
-                encoded_m3u8 = quote(item['m3u8_url'], safe='')
-                encoded_ref = quote(BASE_URL, safe='')
-                stream_url = f"https://{WORKER_DOMAIN}/proxy?url={encoded_m3u8}&referer={encoded_ref}"
-            else:
-                # Fallback an toàn qua route /live nếu chưa bắt kịp m3u8
-                stream_url = f"https://{WORKER_DOMAIN}/live?url={quote(item['url'], safe='')}"
+            # Ưu tiên lấy trực tiếp link m3u8 bắt được, nếu không có lấy link gốc của trang
+            stream_url = item['m3u8_url'] if item['m3u8_url'] else item['url']
             
             f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{item["title"]}\n')
             f.write(f'{stream_url}\n\n')
