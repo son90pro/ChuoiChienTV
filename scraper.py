@@ -11,7 +11,7 @@ GROUP_NAME = "Chuối Chiên TV"
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
-# Bảng ánh xạ Server Stream chuẩn theo tên BLV
+# Bảng ánh xạ Server Stream chuẩn cố định 100% theo tên BLV của Chuối Chiên TV
 CASTER_STREAM_MAP = {
     "troctru": "https://stm9ee346727718.stream.hdplaylink.com/cctvlive/troctruhd/playlist.m3u8",
     "chuoinho": "https://gckc0525.edgemaxcdn.org/live/chuoinhohd/playlist.m3u8",
@@ -22,6 +22,9 @@ CASTER_STREAM_MAP = {
     "chuoingao": "https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoingaohd/playlist.m3u8",
     "chuoito": "https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoitohd/playlist.m3u8",
     "chuoitay": "https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoitayhd/playlist.m3u8",
+    "chuoilap": "https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoilaphd/playlist.m3u8",
+    "chuoiky": "https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoikyhd/playlist.m3u8",
+    "chuoibeo": "https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoibeohd/playlist.m3u8",
 }
 
 KNOWN_BLVS = [
@@ -45,10 +48,10 @@ def clean_word(w: str) -> str:
     if w_low in ['u23', 'u21', 'u20', 'u19', 'u18', 'u17', 'u16']: return w.upper()
     return w.capitalize()
 
-def parse_match_details(url: str, card_text: str, page_title: str = ""):
-    combined_text = f"{page_title} {card_text}"
+def parse_card_info(url: str, card_text: str):
+    combined_text = card_text.strip()
     
-    # 1. Nhận diện môn thể thao
+    # 1. Nhận diện môn thể thao (Bóng đá, Bóng chuyền, Bóng rổ...)
     sport_icon = "⚽"
     text_lower = combined_text.lower()
     if any(k in text_lower for k in ["bóng chuyền", "volleyball", "🏐"]):
@@ -57,8 +60,6 @@ def parse_match_details(url: str, card_text: str, page_title: str = ""):
         sport_icon = "🏀"
     elif any(k in text_lower for k in ["tennis", "quần vợt", "🎾"]):
         sport_icon = "🎾"
-    elif any(k in text_lower for k in ["cầu lông", "badminton", "🏸"]):
-        sport_icon = "🏸"
 
     # 2. Bóc tách tên BLV
     blv_name = ""
@@ -68,7 +69,7 @@ def parse_match_details(url: str, card_text: str, page_title: str = ""):
             break
             
     if not blv_name:
-        match_blv = re.search(r'\(([^)]+)\)', card_text)
+        match_blv = re.search(r'\(([^)]+)\)', combined_text)
         if match_blv:
             val = match_blv.group(1).strip()
             if not any(k in val.lower() for k in ["fhd", "hls", "flv", "hd", "geo"]):
@@ -77,7 +78,7 @@ def parse_match_details(url: str, card_text: str, page_title: str = ""):
     if not blv_name:
         blv_name = "Chuối Chiên"
 
-    # 3. Bóc tách tên 2 đội bóng
+    # 3. Trích xuất tên 2 Đội bóng từ Text hoặc URL Slug
     teams_title = ""
     vs_match = re.search(r'([A-Za-zÀ-ỹ0-9\s\.]{2,30})\s+vs\s+([A-Za-zÀ-ỹ0-9\s\.]{2,30})', combined_text, re.I)
     if vs_match:
@@ -96,6 +97,7 @@ def parse_match_details(url: str, card_text: str, page_title: str = ""):
                 parts = slug.split('-vs-')
                 t1_slug, t2_slug = parts[0], parts[1]
 
+                # Dọn dẹp tiền tố BLV dính trong Slug
                 t1_slug = re.sub(r'^(?:blv|caster|troc|chuoi|nho|kem|say|ga|ly|chao|la|ngao|to|tay)-[a-z0-9]+-', '', t1_slug, flags=re.I)
                 t1_slug = re.sub(r'^(?:blv|caster|troc-tru|chuoi-nho|chuoi-chao|chuoi-la|chuoi-ngao|chuoi-kem|chuoi-say|chuoi-to|chuoi-tay)-', '', t1_slug, flags=re.I)
                 t1_slug = re.sub(r'^(?:truc-tiep|xem-truc-tiep|match|live)-', '', t1_slug, flags=re.I)
@@ -114,51 +116,14 @@ def parse_match_details(url: str, card_text: str, page_title: str = ""):
     if not teams_title:
         teams_title = "Trận đấu Trực Tiếp"
 
-    return sport_icon, teams_title, blv_name
-
-def extract_real_m3u8(context, match_url, blv_name):
-    """Bắt link .m3u8 thực tế hoặc fallback theo luồng chuẩn của BLV"""
-    page = None
-    captured_urls = []
-    page_title = ""
-    
-    try:
-        page = context.new_page()
-        page.route("**/*.{png,jpg,jpeg,svg,css,woff,woff2}", lambda route: route.abort())
-
-        def handle_request(req):
-            u = req.url
-            if ".m3u8" in u and "blob:" not in u and u not in captured_urls:
-                captured_urls.append(u)
-
-        page.on("request", handle_request)
-        page.goto(match_url, timeout=10000, wait_until="domcontentloaded")
-        time.sleep(0.8)
-        page_title = page.title()
-
-        for _ in range(4):
-            if captured_urls:
-                break
-            time.sleep(0.3)
-    except Exception:
-        pass
-    finally:
-        if page:
-            try:
-                page.close()
-            except Exception:
-                pass
-
-    if captured_urls:
-        return page_title, captured_urls[0]
-
-    # Fallback theo cấu trúc server chuẩn nếu không bắt được luồng động
-    slug = to_slug(blv_name)
-    fallback_url = CASTER_STREAM_MAP.get(
-        slug, 
-        f"https://stm9ee346727718.stream.hdplaylink.com/cctvlive/{slug}hd/playlist.m3u8"
+    # 4. Tạo đường link luồng .m3u8 tương ứng theo BLV
+    blv_slug = to_slug(blv_name)
+    stream_url = CASTER_STREAM_MAP.get(
+        blv_slug, 
+        f"https://stm9ee346727718.stream.hdplaylink.com/cctvlive/{blv_slug}hd/playlist.m3u8"
     )
-    return page_title, fallback_url
+
+    return sport_icon, teams_title, blv_name, stream_url
 
 def run_scraper():
     vn_tz = timezone(timedelta(hours=7))
@@ -179,7 +144,7 @@ def run_scraper():
             )
             
             page = context.new_page()
-            print(f"[*] Kết nối tới: {BASE_URL}")
+            print(f"[*] Đang kết nối tới: {BASE_URL}")
             page.goto(BASE_URL, timeout=45000, wait_until="domcontentloaded")
             time.sleep(2)
 
@@ -187,7 +152,7 @@ def run_scraper():
                 page.evaluate("window.scrollBy(0, 800)")
                 time.sleep(0.3)
 
-            # Quét danh sách trận từ Trang chủ
+            # Quét toàn bộ thẻ trận đấu từ Trang chủ trong 1 lần duy nhất
             raw_matches = page.evaluate('''() => {
                 const results = [];
                 const selector = 'a[href*="/truc-tiep/"], a[href*="/match/"], a[href*="/live/"], a[href*="/xem/"], a[href*="/room/"], a[href*="/phong/"]';
@@ -213,7 +178,9 @@ def run_scraper():
                     let logoUrl = '';
                     if (img) {
                         logoUrl = img.getAttribute('src') || img.getAttribute('data-src') || '';
-                        if (logoUrl && !logoUrl.startsWith('http')) {
+                        if (logoUrl.startsWith('//')) {
+                            logoUrl = 'https:' + logoUrl;
+                        } else if (logoUrl && !logoUrl.startsWith('http')) {
                             logoUrl = window.location.origin + logoUrl;
                         }
                     }
@@ -233,7 +200,9 @@ def run_scraper():
             }''')
 
             page.close()
-            print(f"[*] Đã bóc tách {len(raw_matches)} trận. Tiến hành xử lý luồng & dữ liệu...")
+            browser.close()
+
+            print(f"[*] Quét thành công {len(raw_matches)} trận. Đang tiến hành tạo danh sách M3U...")
 
             for item in raw_matches:
                 match_url = item['url']
@@ -241,13 +210,7 @@ def run_scraper():
                 card_logo = item['logo'] if item['logo'] else DEFAULT_LOGO
                 is_live = item['isLive']
 
-                # Lấy tên BLV sơ bộ từ Card
-                _, initial_blv = parse_match_details(match_url, card_text)
-
-                # Mở trang để lấy .m3u8 thực tế
-                page_title, m3u8_stream = extract_real_m3u8(context, match_url, initial_blv)
-
-                sport_icon, teams_title, blv_name = parse_match_details(match_url, card_text, page_title)
+                sport_icon, teams_title, blv_name, stream_url = parse_card_info(match_url, card_text)
 
                 # Giờ & Ngày
                 time_match = re.search(r'\b(2[0-3]|[0-1]?\d)[:h](\d{2})\b', card_text, re.I)
@@ -258,7 +221,8 @@ def run_scraper():
                 date_match = re.search(r'ngay-(\d{1,2})[-_](\d{1,2})', match_url, re.I)
                 match_date = f"{date_match.group(1).zfill(2)}/{date_match.group(2).zfill(2)}" if date_match else today_str
 
-                # Ghép tiêu đề đúng chuẩn 100% mẫu M3U web
+                # Cấu trúc tiêu đề chuẩn 100% mẫu web:
+                # , 🟢 20:00 25/09 ⚽ Indonesia vs Singapore (Trốc Tru) [FHD] [hls]
                 live_dot = "🟢 " if is_live else ""
                 full_title = f"{live_dot}{extracted_time} {match_date} {sport_icon} {teams_title} ({blv_name}) [FHD] [hls]"
 
@@ -272,19 +236,18 @@ def run_scraper():
                 parsed_items.append({
                     "title": full_title,
                     "logo": card_logo,
-                    "stream_url": m3u8_stream,
+                    "stream_url": stream_url,
                     "dt": dt_obj,
                     "is_live": is_live,
                     "match_url": match_url
                 })
 
             parsed_items.sort(key=lambda x: (not x['is_live'], x['dt'].date(), x['dt'].time()))
-            browser.close()
 
     except Exception as e:
         print(f"[!] Lỗi tiến trình Playwright: {e}")
 
-    # GHI FILE M3U CHUẨN ĐÚNG CẤU TRÚC MẪU
+    # GHI FILE M3U CHUẨN CÚ PHÁP
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write('#EXTM3U\n\n')
         seen_urls = set()
@@ -297,7 +260,7 @@ def run_scraper():
             f.write(f'#EXTVLCOPT:http-referrer={REFERER_URL}\n')
             f.write(f'{item["stream_url"]}\n\n')
 
-    print(f"[*] Xuất hoàn tất {len(parsed_items)} trận vào file {OUTPUT_FILE}")
+    print(f"[*] Đã xuất hoàn tất {len(parsed_items)} trận vào file {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     run_scraper()
