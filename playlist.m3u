@@ -1,0 +1,47 @@
+#EXTM3U tvg-shift="0"
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/un.png" group-title="Chuối Chiên TV" , 01:45 25/09 ⚽ Trận đấu Trực Tiếp (Chuối Nhỏ) [FHD] [hls] 
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+#EXTVLCOPT:http-referrer=https://live07.chuoichientv.me/
+https://live07.chuoichientv.me/live/1528882/trkiye-vs-france|User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36&Referer=https://live07.chuoichientv.me/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/un.png" group-title="Chuối Chiên TV" , 01:45 25/09 ⚽ Trận đấu Trực Tiếp (Trốc Tru) [FHD] [hls] 
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+#EXTVLCOPT:http-referrer=https://live07.chuoichientv.me/
+https://live07.chuoichientv.me/live/1528883/italy-vs-belgium|User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36&Referer=https://live07.chuoichientv.me/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/un.png" group-title="Chuối Chiên TV" , 01:45 25/09 ⚽ Trận đấu Trực Tiếp (Chuối Chao) [FHD] [hls] 
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+#EXTVLCOPT:http-referrer=https://live07.chuoichientv.me/
+https://live07.chuoichientv.me/live/1528884/hungary-vs-ukraine|User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36&Referer=https://live07.chuoichientv.me/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/un.png" group-title="Chuối Chiên TV" , 01:45 25/09 ⚽ Trận đấu Trực Tiếp (Chuối Lá) [FHD] [hls] 
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+#EXTVLCOPT:http-referrer=https://live07.chuoichientv.me/
+https://live07.chuoichientv.me/live/1528885/poland-vs-bosnia-herzegovina|User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36&Referer=https://live07.chuoichientv.me/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/un.png" group-title="Chuối Chiên TV" , 01:45 25/09 ⚽ Trận đấu Trực Tiếp (Chuối Ngao) [FHD] [hls] 
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+#EXTVLCOPT:http-referrer=https://live07.chuoichientv.me/
+https://live07.chuoichientv.me/live/1528886/sweden-vs-romania|User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36&Referer=https://live07.chuoichientv.me/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/un.png" group-title="Chuối Chiên TV" , 20:00 25/09 ⚽ Trận đấu Trực Tiếp (Trốc Tru) [FHD] [hls] 
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+#EXTVLCOPT:http-referrer=https://live07.chuoichientv.me/
+https://live07.chuoichientv.me/live/1641703/indonesia-vs-singapore|User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36&Referer=https://live07.chuoichientv.me/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/un.png" group-title="Chuối Chiên TV" , 21:00 25/09 ⚽ Trận đấu Trực Tiếp (Chuối Nhỏ) [FHD] [hls] 
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+#EXTVLCOPT:http-referrer=https://live07.chuoichientv.me/
+https://live07.chuoichientv.me/live/1637600/india-vs-panama|User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36&Referer=https://live07.chuoichientv.me/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/un.png" group-title="Chuối Chiên TV" , 22:00 25/09 ⚽ Trận đấu Trực Tiếp (Chuối Kem) [FHD] [hls] 
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+#EXTVLCOPT:http-referrer=https://live07.chuoichientv.me/
+https://live07.chuoichientv.me/live/998383/slovakia-w-vs-poland|User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36&Referer=https://live07.chuoichientv.me/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/un.png" group-title="Chuối Chiên TV" , 23:00 25/09 ⚽ Trận đấu Trực Tiếp (Chuối Sấy) [FHD] [hls] 
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+#EXTVLCOPT:http-referrer=https://live07.chuoichientv.me/
+https://live07.chuoichientv.me/live/1545602/armenia-vs-latvia|User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36&Referer=https://live07.chuoichientv.me/
+
