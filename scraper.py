@@ -111,12 +111,10 @@ def parse_datetime_obj(date_str: str, time_str: str, vn_tz) -> datetime:
         return datetime(2099, 1, 1, 0, 0, tzinfo=vn_tz)
 
 def extract_stream_m3u8(context, match_url):
-    """Trích xuất đường dẫn .m3u8 trực tiếp bằng cách bắt gói tin siêu nhanh"""
+    """Trích xuất chính xác luồng .m3u8 từ iframe và các gói tin mạng"""
     page = context.new_page()
-    # Chặn hình ảnh, CSS, font để trang tải cực nhanh (< 1.5 giây)
-    page.route("**/*.{png,jpg,jpeg,svg,css,woff,woff2,gif,ico}", lambda route: route.abort())
-    
     captured_urls = []
+    
     def handle_request(req):
         u = req.url
         if (".m3u8" in u or ".flv" in u) and "blob:" not in u and u not in captured_urls:
@@ -125,24 +123,25 @@ def extract_stream_m3u8(context, match_url):
     page.on("request", handle_request)
     
     try:
-        page.goto(match_url, timeout=8000, wait_until="domcontentloaded")
-        
-        # Click tự động vào player/iframe để kích hoạt luồng phát
-        for selector in ["iframe", "video", ".play-btn", "button:has-text('HD1')", "button:has-text('HD2')"]:
+        page.goto(match_url, timeout=12000, wait_until="domcontentloaded")
+        time.sleep(1.5)
+
+        # Kích hoạt trình phát video
+        for selector in ["iframe", "video", ".play-btn", "button:has-text('HD1')", "button:has-text('HD2')", ".vjs-big-play-button"]:
             try:
                 el = page.query_selector(selector)
                 if el:
-                    el.click(timeout=800)
-                    time.sleep(0.3)
+                    el.click(timeout=1000)
+                    time.sleep(0.5)
             except Exception:
                 pass
 
-        for _ in range(5):
+        for _ in range(6):
             if captured_urls:
                 break
-            time.sleep(0.3)
+            time.sleep(0.4)
 
-        # Nếu mạng chưa chộp kịp, quét mã HTML / Iframe
+        # Quét iframe nếu mạng chưa chộp kịp
         if not captured_urls:
             for frame in page.frames:
                 try:
@@ -223,7 +222,7 @@ def run_scraper():
             }''')
 
             page.close()
-            print(f"[*] Quét thành công {len(raw_cards)} trận. Đang bắt luồng .m3u8 từng trận...")
+            print(f"[*] Quét thành công {len(raw_cards)} trận. Đang bóc tách luồng .m3u8...")
 
             for item in raw_cards:
                 match_url = item['url']
@@ -248,10 +247,9 @@ def run_scraper():
 
                 final_logo = process_logo_url(raw_logo, team1_name, teams_title)
 
-                # Trích xuất luồng video .m3u8
+                # Bắt luồng .m3u8 thực sự
                 m3u8_url = extract_stream_m3u8(context, match_url)
 
-                # Trạng thái LIVE
                 is_currently_live = bool(m3u8_url) or bool(re.search(r'(hiệp 1|hiệp 2|hiệp phụ|h1|h2|đang đá|đang diễn ra|\d+[\'’])', card_text, re.I))
 
                 extracted_time = parse_time_robust(match_url, card_text)
@@ -265,12 +263,11 @@ def run_scraper():
                 else:
                     title_fmt = f"[{match_date} - {extracted_time}] {teams_title}{blv_suffix}"
 
-                # Tạo link chuẩn cho trình phát IPTV
+                # Đi qua Cloudflare Worker Rewrite M3U8
                 if m3u8_url:
-                    stream_link = f"https://{WORKER_DOMAIN}/proxy?url={quote(m3u8_url, safe='')}"
+                    stream_link = f"https://{WORKER_DOMAIN}/?url={quote(m3u8_url, safe='')}"
                 else:
-                    # Link dự phòng nếu chưa tới giờ phát
-                    stream_link = f"https://{WORKER_DOMAIN}/live?url={quote(match_url, safe='')}"
+                    stream_link = f"https://{WORKER_DOMAIN}/?url={quote(match_url, safe='')}"
 
                 dt_obj = parse_datetime_obj(match_date, extracted_time, vn_tz)
 
@@ -278,7 +275,6 @@ def run_scraper():
                     "title": title_fmt,
                     "logo": final_logo,
                     "stream_link": stream_link,
-                    "m3u8_url": m3u8_url,
                     "is_live": is_currently_live,
                     "date": match_date,
                     "time": extracted_time,
@@ -286,7 +282,6 @@ def run_scraper():
                     "match_url": match_url
                 })
 
-            # Sắp xếp: Ngày hôm nay -> Trận LIVE -> Giờ thi đấu
             parsed_items.sort(key=lambda x: (x['dt'].date(), not x['is_live'], x['dt'].time()))
 
             seen_matches = set()
@@ -318,7 +313,6 @@ def run_scraper():
         for item in final_list:
             logo_attr = f'tvg-logo="{item["logo"]}"' if item["logo"] else ''
             
-            # Đính kèm Header Referer & User-Agent trực tiếp vào đuôi URL
             full_playable_url = f"{item['stream_link']}|User-Agent={USER_AGENT}&Referer={REFERRER_HEADER}"
             
             f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{item["title"]}\n')
