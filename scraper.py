@@ -10,7 +10,7 @@ BASE_URL = "https://chuoichientv.org"
 OUTPUT_FILE = "playlist.m3u"
 
 # Tên nhóm danh mục hiển thị trên ứng dụng IPTV
-GROUP_NAME = "Phá Làng TV"
+GROUP_NAME = "Chuối Chiên TV"
 
 # Bảng tra cứu cờ quốc gia chuẩn hóa
 LOGOS = {
