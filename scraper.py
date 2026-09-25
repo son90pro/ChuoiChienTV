@@ -1,15 +1,14 @@
 import time
 import re
-import json
 from datetime import datetime, timezone, timedelta
 from urllib.parse import quote
 from playwright.sync_api import sync_playwright
 
 WORKER_DOMAIN = "chuoi-chien-iptv.sonnguyen90pro.workers.dev"
-BASE_URL = "https://live07.chuoichientv.me/"
+BASE_URL = "https://live07.chuoichientv.me"
 OUTPUT_FILE = "playlist.m3u"
 
-# Tên nhóm danh mục hiển thị trên ứng dụng IPTV
+# Tên nhóm danh mục hiển thị trên ứng dụng IPTV giống hình mẫu
 GROUP_NAME = "Chuối Chiên TV"
 
 # Bảng tra cứu cờ quốc gia chuẩn hóa
@@ -24,6 +23,7 @@ LOGOS = {
     "england": "https://flagcdn.com/w320/gb-eng.png", "anh": "https://flagcdn.com/w320/gb-eng.png",
     "wales": "https://flagcdn.com/w320/gb-wls.png", "scotland": "https://flagcdn.com/w320/gb-sct.png",
     "andorra": "https://flagcdn.com/w320/ad.png", "malta": "https://flagcdn.com/w320/mt.png",
+    "Slovakia": "https://flagcdn.com/w320/sk.png", "Armenia": "https://flagcdn.com/w320/am.png", "Latvia": "https://flagcdn.com/w320/lv.png",
 
     # Châu Á & Trung Đông
     "vietnam": "https://flagcdn.com/w320/vn.png", "việt nam": "https://flagcdn.com/w320/vn.png",
@@ -33,12 +33,9 @@ LOGOS = {
     "south korea": "https://flagcdn.com/w320/kr.png", "hàn quốc": "https://flagcdn.com/w320/kr.png", "korea": "https://flagcdn.com/w320/kr.png",
     "china": "https://flagcdn.com/w320/cn.png", "trung quốc": "https://flagcdn.com/w320/cn.png",
     "qatar": "https://flagcdn.com/w320/qa.png", "bahrain": "https://flagcdn.com/w320/bh.png",
-    "united arab emirates": "https://flagcdn.com/w320/ae.png", "uae": "https://flagcdn.com/w320/ae.png",
-    "yemen": "https://flagcdn.com/w320/ye.png", "maldives": "https://flagcdn.com/w320/mv.png",
-    "myanmar": "https://flagcdn.com/w320/mm.png", "timor leste": "https://flagcdn.com/w320/tl.png",
+    "india": "https://flagcdn.com/w320/in.png", "panama": "https://flagcdn.com/w320/pa.png",
 
     # Châu Phi & Nam Mỹ
-    "namibia": "https://flagcdn.com/w320/na.png", "congo": "https://flagcdn.com/w320/cg.png", "republic of the congo": "https://flagcdn.com/w320/cg.png",
     "brazil": "https://flagcdn.com/w320/br.png", "argentina": "https://flagcdn.com/w320/ar.png",
     "uruguay": "https://flagcdn.com/w320/uy.png", "ecuador": "https://flagcdn.com/w320/ec.png"
 }
@@ -76,11 +73,9 @@ def parse_teams_from_url(url: str) -> str:
 
         team1_slug, team2_slug = parts[0], parts[1]
 
-        # Làm sạch tên đội 1 (bỏ tiền tố BLV)
-        team1_slug = re.sub(r'^(?:blv-)?(?:ga|caster)-(?:sieu-[a-z0-9]+|[a-z0-9]+)-', '', team1_slug, flags=re.IGNORECASE)
+        team1_slug = re.sub(r'^(?:blv-)?(?:ga|caster|chuoi|troc|nho|kem|lap|ky)-(?:sieu-[a-z0-9]+|[a-z0-9]+)-', '', team1_slug, flags=re.IGNORECASE)
         team1_slug = re.sub(r'^blv-[a-z0-9]+-', '', team1_slug, flags=re.IGNORECASE)
         
-        # Làm sạch tên đội 2 (bỏ hậu tố thời gian, ngày)
         team2_slug = re.sub(r'-luc-\d+.*$', '', team2_slug, flags=re.IGNORECASE)
         team2_slug = re.sub(r'-ngay-\d+.*$', '', team2_slug, flags=re.IGNORECASE)
         team2_slug = re.sub(r'-\d{3,4}$', '', team2_slug, flags=re.IGNORECASE)
@@ -111,46 +106,26 @@ def parse_date_info(url: str, text: str, default_date: str) -> str:
     return default_date
 
 def parse_time_robust(url: str, text: str) -> str:
-    """Trích xuất thời gian chính xác từ URL slug, text, hoặc DOM"""
     text_time = re.search(r'\b(2[0-3]|[0-1]?\d)[:h](\d{2})\b', text, re.IGNORECASE)
     if text_time:
-        hh = text_time.group(1).zfill(2)
-        mm = text_time.group(2)
-        return f"{hh}:{mm}"
+        return f"{text_time.group(1).zfill(2)}:{text_time.group(2)}"
 
-    url_luc_4 = re.search(r'luc[-_]?(2[0-3]|[0-1]\d)(\d{2})', url, re.IGNORECASE)
+    url_luc_4 = re.search(r'(?:luc|time)?[-_]?(2[0-3]|[0-1]\d)(\d{2})', url, re.IGNORECASE)
     if url_luc_4:
-        hh = url_luc_4.group(1).zfill(2)
-        mm = url_luc_4.group(2)
-        return f"{hh}:{mm}"
-
-    url_hhmm = re.search(r'(?:luc[-_]?)?(2[0-3]|[0-1]\d)(\d{2})(?:[-_]|$)', url, re.IGNORECASE)
-    if url_hhmm:
-        hh = url_hhmm.group(1).zfill(2)
-        mm = url_hhmm.group(2)
-        return f"{hh}:{mm}"
-
-    text_digit = re.search(r'\b(2[0-3]|[0-1]\d)(\d{2})\b', text)
-    if text_digit:
-        hh = text_digit.group(1).zfill(2)
-        mm = text_digit.group(2)
-        return f"{hh}:{mm}"
+        return f"{url_luc_4.group(1).zfill(2)}:{url_luc_4.group(2)}"
 
     return "00:00"
 
 def parse_datetime_obj(date_str: str, time_str: str, vn_tz) -> datetime:
-    """Chuyển ngày/giờ thành đối tượng datetime để so sánh chính xác mốc thời gian"""
     now = datetime.now(vn_tz)
     try:
         d, m = map(int, date_str.split('/'))
         h, mins = map(int, time_str.split(':'))
-        
         yr = now.year
         if now.month == 12 and m == 1:
             yr += 1
         elif now.month == 1 and m == 12:
             yr -= 1
-            
         return datetime(yr, m, d, h, mins, tzinfo=vn_tz)
     except Exception:
         return datetime(2099, 1, 1, 0, 0, tzinfo=vn_tz)
@@ -162,7 +137,7 @@ def get_match_details(context, match_url):
     m3u8_found = []
     def handle_request(request):
         url = request.url
-        if ".m3u8" in url and "blob:" not in url and url not in m3u8_found:
+        if (".m3u8" in url or ".flv" in url) and "blob:" not in url and url not in m3u8_found:
             m3u8_found.append(url)
             
     page.on("request", handle_request)
@@ -185,7 +160,7 @@ def get_match_details(context, match_url):
             for frame in page.frames:
                 try:
                     content = frame.content()
-                    urls = re.findall(r'https?://[^\s"\'<>]+\.m3u8[^\s"\'<>]*', content)
+                    urls = re.findall(r'https?://[^\s"\'<>]+\.(?:m3u8|flv)[^\s"\'<>]*', content)
                     for u in urls:
                         if "blob:" not in u and u not in m3u8_found:
                             m3u8_found.append(u)
@@ -198,9 +173,7 @@ def get_match_details(context, match_url):
             let tStr = "";
             let liveState = false;
             const fullBody = document.body.innerText || '';
-            
-            # Chỉ coi là LIVE khi xuất hiện thời gian phút trận đấu hoặc các từ khóa đang thi đấu thực sự
-            if (/(hiệp 1|hiệp 2|hiệp phụ|h1|h2|đang đá|đang diễn ra|\\d+['’])/i.test(fullBody)) {
+            if (/(hiệp 1|hiệp 2|hiệp phụ|h1|h2|đang đá|đang diễn ra|\\d+['’]|live)/i.test(fullBody)) {
                 liveState = true;
             }
 
@@ -217,8 +190,6 @@ def get_match_details(context, match_url):
 
         if details['timeStr']:
             match_info["time_str"] = details['timeStr']
-            
-        # LIVE thực sự khi phát hiện chỉ số trận hoặc có luồng m3u8 phát thành công
         match_info["is_live"] = details['liveState'] or bool(match_info["m3u8_url"])
 
     except Exception:
@@ -249,7 +220,7 @@ def run_scraper():
 
         raw_matches = []
         try:
-            print(f"[*] Đang tải trang Gà Vàng 33 TV: {BASE_URL}")
+            print(f"[*] Đang tải trang Chuối Chiên TV: {BASE_URL}")
             page.goto(BASE_URL, timeout=60000, wait_until="domcontentloaded")
             
             try:
@@ -304,8 +275,7 @@ def run_scraper():
             }''')
 
             page.close()
-
-            print(f"[*] Quét được {len(raw_matches)} trận đấu. Đang phân tích & sắp xếp theo ngày...")
+            print(f"[*] Quét được {len(raw_matches)} trận đấu. Đang phân tích chi tiết...")
 
             parsed_items = []
             for item in raw_matches:
@@ -320,31 +290,36 @@ def run_scraper():
                 extracted_time = parse_time_robust(url, raw_time_text)
                 match_date = parse_date_info(url, text, today_str)
 
-                # Nhận diện LIVE thực tế
-                is_currently_live = details['is_live'] or any(k in text.lower() for k in ["hiệp 1", "hiệp 2", "đang đá", "đang diễn ra"])
+                is_currently_live = details['is_live'] or any(k in text.lower() for k in ["hiệp 1", "hiệp 2", "đang đá", "đang diễn ra", "live"])
 
+                # Bóc tách tên BLV theo chuẩn mẫu (Trốc Tru, Chuối Nhỏ, Chuối Kem, Chuối Sấy...)
                 blv_name = ""
-                blv_match = re.search(r'((?:Gà|BLV|Caster)\s+[A-Za-zÀ-ỹ0-9\s\+]+)', text, re.IGNORECASE)
+                blv_match = re.search(r'((?:Chuối|Trốc|BLV|Caster|Đội|Nhà)\s+[A-Za-zÀ-ỹ0-9\s\+]+)', text, re.IGNORECASE)
                 if blv_match:
                     raw_blv = blv_match.group(1).strip()
-                    raw_blv = re.split(r'(?:hls|flv|live|trực tiếp|\d{1,2}:\d{2}|hiệp|cúp|league)', raw_blv, flags=re.IGNORECASE)[0].strip()
+                    raw_blv = re.split(r'(?:hls|flv|live|trực tiếp|\d{1,2}:\d{2}|hiệp|cúp|league|\[)', raw_blv, flags=re.IGNORECASE)[0].strip()
                     blv_name = raw_blv
 
+                # Thử quét từ slug URL nếu không tìm thấy trong text
+                if not blv_name:
+                    slug_blv_match = re.search(r'/(?:blv|caster|chuoi|troc)-([a-z0-9-]+?)-', url, re.I)
+                    if slug_blv_match:
+                        blv_name = slug_blv_match.group(1).replace('-', ' ').title()
+
                 clean_blv = re.sub(r'^(BLV|Caster)\s*[:\-]?\s*', '', blv_name, flags=re.IGNORECASE).strip()
+                if not clean_blv:
+                    clean_blv = "Chuối Chiên"
 
                 teams_str = parse_teams_from_url(url)
                 if not teams_str:
                     teams_str = "Trận đấu Trực Tiếp"
 
                 logo = get_team_logo_url(teams_str)
-                blv_suffix = f" ({clean_blv.title()})" if clean_blv else ""
+                stream_type = "[flv]" if "flv" in url.lower() or "stream2" in url.lower() else "[hls]"
 
-                if is_currently_live:
-                    full_title = f"[{match_date} - 🔴 LIVE {extracted_time}] {teams_str}{blv_suffix}".strip()
-                else:
-                    full_title = f"[{match_date} - {extracted_time}] {teams_str}{blv_suffix}".strip()
+                # ĐỊNH DẠNG CHUẨN GIỐNG HÌNH MẪU 1806: 20:00 25/09 ⚽ Indonesia vs Singapore (Trốc Tru) [FHD] [hls]
+                full_title = f"{extracted_time} {match_date} ⚽ {teams_str} ({clean_blv}) [FHD] {stream_type}".strip()
 
-                # Tạo mốc datetime chính xác để sắp xếp
                 dt_obj = parse_datetime_obj(match_date, extracted_time, vn_tz)
 
                 parsed_items.append({
@@ -358,10 +333,7 @@ def run_scraper():
                     "dt": dt_obj
                 })
 
-            # THUẬT TOÁN SẮP XẾP CHUẨN:
-            # 1. Ngày thi đấu (dt.date()) -> Ngày hôm nay (25/09) luôn lên trước Ngày mai (26/09)
-            # 2. Trạng thái LIVE (not is_live) -> Trong cùng 1 ngày, trận 🔴 LIVE lên đầu
-            # 3. Giờ thi đấu (dt.time()) -> Xếp theo thứ tự giờ thi đấu tăng dần
+            # Sắp xếp theo ngày hôm nay lên đầu, trận LIVE ưu tiên, tiếp đến giờ tăng dần
             parsed_items.sort(key=lambda x: (x['dt'].date(), not x['is_live'], x['dt'].time()))
 
             seen_urls = set()
@@ -386,7 +358,7 @@ def run_scraper():
         finally:
             browser.close()
 
-    # Ghi file M3U Playlist
+    # Ghi file M3U Playlist đúng chuẩn định dạng phát mượt
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write('#EXTM3U tvg-shift="0"\n\n')
 
@@ -403,7 +375,7 @@ def run_scraper():
             f.write(f'#EXTVLCOPT:http-referrer={BASE_URL}/\n')
             f.write(f'{stream_url}|User-Agent=Mozilla/5.0&Referer={BASE_URL}/\n\n')
 
-    print(f"[*] Đã xuất {len(final_matches)} trận vào file {OUTPUT_FILE} (Group: {GROUP_NAME}) - Đã ưu tiên sắp xếp Ngày hôm nay lên đầu!")
+    print(f"[*] Đã xuất {len(final_matches)} trận vào file {OUTPUT_FILE} (Group: {GROUP_NAME}) thành công!")
 
 if __name__ == "__main__":
     run_scraper()
