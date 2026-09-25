@@ -4,11 +4,13 @@ from datetime import datetime
 from urllib.parse import urljoin, quote
 from playwright.sync_api import sync_playwright
 
-BASE_URL = "https://phalang.tv"
+BASE_URL = "https://phalang.live"
 OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Phá Làng TV"
-REFERRER_HEADER = "https://phalang.tv/"
-WORKER_DOMAIN = "cctv.sonnguyen90pro.workers.dev"
+REFERRER_HEADER = "https://phalang.live/"
+
+# Đã đổi WORKER_DOMAIN mới theo yêu cầu
+WORKER_DOMAIN = "pha-lang-iptv.sonnguyen90pro.workers.dev"
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
@@ -44,7 +46,7 @@ def clean_team_name(name: str) -> str:
     return s
 
 def process_logo_url(raw_logo: str, team1_name: str, teams_title: str) -> str:
-    """Ưu tiên ghép cờ theo Đội 1 để khớp với hình ảnh mẫu"""
+    """Ưu tiên ghép cờ theo Đội 1"""
     t1_lower = team1_name.lower().strip()
     for k, v in FLAG_LOGOS.items():
         if k in t1_lower:
@@ -66,7 +68,7 @@ def process_logo_url(raw_logo: str, team1_name: str, teams_title: str) -> str:
     return "https://flagcdn.com/w320/un.png"
 
 def parse_time_and_date(card_text: str, match_url: str, detail_text: str, default_date: str) -> str:
-    """Trích xuất thời gian đầy đủ cho mọi trận đấu kể cả trận đầu tiên"""
+    """Trích xuất thời gian đầy đủ cho mọi trận đấu"""
     for text in [card_text, detail_text]:
         if not text:
             continue
@@ -78,7 +80,6 @@ def parse_time_and_date(card_text: str, match_url: str, detail_text: str, defaul
             d_val = time_match.group(2) if time_match.group(2) else default_date
             return f"{t_val} {d_val}"
 
-    # Bóc thời gian từ URL Slug nếu giao diện ẩn giờ
     url_time = re.search(r'(?:luc|h|-)(\d{1,2})h(\d{2})', match_url, re.I)
     url_date = re.search(r'(?:ngay|-)(\d{1,2})[-/](\d{1,2})', match_url, re.I)
     if url_time:
@@ -89,11 +90,10 @@ def parse_time_and_date(card_text: str, match_url: str, detail_text: str, defaul
     return f"13:00 {default_date}"
 
 def parse_blv_name(card_text: str, match_url: str, detail_text: str) -> str:
-    """Bóc tên BLV và viết hoa theo đúng mẫu (Ví dụ: LÝ LÊN LỬA, LÝ LONG)"""
+    """Bóc tên BLV"""
     slug_blv = re.search(r'/(?:truc-tiep|match|live)/.*?blv-([a-z0-9-]+?)-(?:vs|[a-z0-9]+-vs)', match_url, re.I)
     if slug_blv:
-        b_name = slug_blv.group(1).replace('-', ' ').upper()
-        return b_name
+        return slug_blv.group(1).replace('-', ' ').upper()
 
     combined_text = f"{card_text}\n{detail_text}"
     match = re.search(r'\b((?:BLV|Caster|Bình Luận Viên|Gà|Lý)\s+[A-Za-zÀ-ỹ0-9\s]+)\b', combined_text, re.I)
@@ -126,14 +126,13 @@ def run_scraper():
             page.goto(BASE_URL, timeout=60000, wait_until="domcontentloaded")
             time.sleep(3)
 
-            print("[*] Cuộn trang lấy toàn bộ danh sách trận đấu...")
             for _ in range(5):
                 page.evaluate("window.scrollBy(0, 800)")
                 time.sleep(0.5)
 
             raw_cards = page.evaluate('''() => {
                 const results = [];
-                const selector = 'a[href*="/truc-tiep/"], a[href*="/xem-truc-tiep/"], a[href*="/match/"], a[href*="/live/"], a[href*="/tran/"], a[href*="/chi-tiet/"], a[href*="/room/"]';
+                const selector = 'a[href*="/truc-tiep/"], a[href*="/xem-truc-tiep/"], a[href*="/match/"], a[href*="/live/"], a[href*="/tran/"]';
                 const cards = document.querySelectorAll(selector);
                 const seenUrls = new Set();
 
@@ -147,10 +146,7 @@ def run_scraper():
                     let container = card;
                     let parent = card.parentElement;
                     while (parent && parent.tagName !== 'BODY') {
-                        const siblingLinks = parent.querySelectorAll(selector);
-                        if (siblingLinks.length > 1) {
-                            break;
-                        }
+                        if (parent.querySelectorAll(selector).length > 1) break;
                         container = parent;
                         parent = parent.parentElement;
                     }
@@ -170,17 +166,16 @@ def run_scraper():
                 return results;
             }''')
 
-            print(f"[*] Tìm thấy {len(raw_cards)} trận đấu. Đang xử lý dữ liệu...")
+            print(f"[*] Tìm thấy {len(raw_cards)} trận đấu. Đang bóc tách luồng qua worker {WORKER_DOMAIN}...")
 
             for item in raw_cards:
                 match_url = item['url']
                 raw_logo = item['logo']
                 card_text = item['rawText']
 
-                # 1. Trích xuất tên hai đội
                 team1_name = ""
                 teams_title = ""
-                slug_match = re.search(r'/(?:truc-tiep|xem-truc-tiep|match|live|tran|room)/([^/?#]+)', match_url)
+                slug_match = re.search(r'/(?:truc-tiep|xem-truc-tiep|match|live|tran)/([^/?#]+)', match_url)
                 if slug_match:
                     slug = slug_match.group(1)
                     if "-vs-" in slug:
@@ -202,7 +197,6 @@ def run_scraper():
 
                 final_logo = process_logo_url(raw_logo, team1_name, teams_title)
 
-                # 2. Lấy thông tin trang chi tiết và luồng m3u8
                 detail_page = context.new_page()
                 m3u8_captured = []
                 detail_text = ""
@@ -215,10 +209,18 @@ def run_scraper():
                 detail_page.on("request", handle_req)
 
                 try:
-                    detail_page.goto(match_url, timeout=10000, wait_until="domcontentloaded")
-                    time.sleep(1.5)
+                    detail_page.goto(match_url, timeout=12000, wait_until="domcontentloaded")
+                    time.sleep(2)
                     detail_text = detail_page.evaluate("document.body ? document.body.innerText : ''")
-                    
+
+                    server_buttons = detail_page.query_selector_all("button, .server-item, .btn-server")
+                    for btn in server_buttons[:3]:
+                        try:
+                            btn.click(timeout=1000)
+                            time.sleep(1)
+                        except Exception:
+                            pass
+
                     if not m3u8_captured:
                         html_content = detail_page.content()
                         found_m3u8 = re.findall(r'https?://[^\s"\'<>]+\.m3u8[^\s"\'<>]*', html_content)
@@ -230,15 +232,10 @@ def run_scraper():
                 finally:
                     detail_page.close()
 
-                # 3. Trích xuất Thời gian + BLV
                 time_str = parse_time_and_date(card_text, match_url, detail_text, today_str)
                 blv_name = parse_blv_name(card_text, match_url, detail_text)
-
-                # 4. Tạo Tiêu đề theo chuẩn mẫu ảnh 1754
-                # Cấu trúc: 13:00 25/09 ⚽ China Women vs Vietnam Women (LÝ LÊN LỬA) [geo]
                 base_title = f"{time_str} ⚽ {teams_title} ({blv_name}) [geo]".strip()
 
-                # 5. Đưa qua Worker Domain
                 if m3u8_captured:
                     for stream_url in m3u8_captured:
                         matches_list.append({
@@ -259,13 +256,11 @@ def run_scraper():
         finally:
             browser.close()
 
-    # 6. Ghi file M3U Playlist
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n\n")
 
         for item in matches_list:
             logo_attr = f'tvg-logo="{item["logo"]}"' if item["logo"] else ''
-            
             f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{item["title"]}\n')
             f.write(f'#EXTVLCOPT:http-referrer={REFERRER_HEADER}\n')
             f.write(f'{item["url"]}\n\n')
