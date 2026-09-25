@@ -1,6 +1,5 @@
 import time
 import re
-import json
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urljoin, quote
 from playwright.sync_api import sync_playwright
@@ -24,7 +23,12 @@ FLAG_LOGOS = {
     "south korea": "https://flagcdn.com/w320/kr.png", "hàn quốc": "https://flagcdn.com/w320/kr.png",
     "indonesia": "https://flagcdn.com/w320/id.png", "singapore": "https://flagcdn.com/w320/sg.png",
     "uzbekistan": "https://flagcdn.com/w320/uz.png", "saudi arabia": "https://flagcdn.com/w320/sa.png",
-    "thailand": "https://flagcdn.com/w320/th.png", "thái lan": "https://flagcdn.com/w320/th.png"
+    "thailand": "https://flagcdn.com/w320/th.png", "thái lan": "https://flagcdn.com/w320/th.png",
+    "england": "https://flagcdn.com/w320/gb-eng.png", "anh": "https://flagcdn.com/w320/gb-eng.png",
+    "spain": "https://flagcdn.com/w320/es.png", "tây ban nha": "https://flagcdn.com/w320/es.png",
+    "germany": "https://flagcdn.com/w320/de.png", "đức": "https://flagcdn.com/w320/de.png",
+    "france": "https://flagcdn.com/w320/fr.png", "pháp": "https://flagcdn.com/w320/fr.png",
+    "italy": "https://flagcdn.com/w320/it.png", "ý": "https://flagcdn.com/w320/it.png"
 }
 
 def clean_team_name(name: str) -> str:
@@ -53,7 +57,6 @@ def process_logo_url(raw_logo: str, team1_name: str, teams_title: str) -> str:
     return "https://flagcdn.com/w320/un.png"
 
 def parse_time_robust(url: str, text: str) -> str:
-    """Trích xuất thời gian chính xác"""
     text_time = re.search(r'\b(2[0-3]|[0-1]?\d)[:h](\d{2})\b', text, re.I)
     if text_time:
         hh = text_time.group(1).zfill(2)
@@ -83,12 +86,11 @@ def parse_date_info(url: str, text: str, default_date: str) -> str:
         pass
     return default_date
 
-def parse_blv_name(card_text: str, match_url: str, detail_text: str) -> str:
+def parse_blv_name(card_text: str, match_url: str) -> str:
     slug_blv = re.search(r'/(?:truc-tiep|match|live)/.*?blv-([a-z0-9-]+?)-(?:vs|[a-z0-9]+-vs)', match_url, re.I)
     if slug_blv:
         return slug_blv.group(1).replace('-', ' ').upper()
-    combined_text = f"{card_text}\n{detail_text}"
-    match = re.search(r'\b((?:BLV|Caster|Bình Luận Viên|Gà|Lý)\s+[A-Za-zÀ-ỹ0-9\s]+)\b', combined_text, re.I)
+    match = re.search(r'\b((?:BLV|Caster|Bình Luận Viên|Gà|Lý)\s+[A-Za-zÀ-ỹ0-9\s]+)\b', card_text, re.I)
     if match:
         blv = match.group(1).strip()
         return re.sub(r'^(?:Bình Luận Viên|Caster|Gà)\s*', '', blv, flags=re.I).upper()
@@ -111,6 +113,7 @@ def parse_datetime_obj(date_str: str, time_str: str, vn_tz) -> datetime:
 def run_scraper():
     vn_tz = timezone(timedelta(hours=7))
     today_str = datetime.now(vn_tz).strftime("%d/%m")
+    parsed_items = []
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -124,14 +127,13 @@ def run_scraper():
             locale="vi-VN"
         )
         page = context.new_page()
-        parsed_items = []
 
         try:
             print(f"[*] Đang kết nối tới Phá Làng TV: {BASE_URL}")
             page.goto(BASE_URL, timeout=60000, wait_until="domcontentloaded")
-            time.sleep(2)
+            time.sleep(3)
 
-            # Cuộn trang để load toàn bộ thẻ trận đấu
+            # Cuộn trang nạp đủ các thẻ trận
             for _ in range(4):
                 page.evaluate("window.scrollBy(0, 800)")
                 time.sleep(0.5)
@@ -170,7 +172,7 @@ def run_scraper():
                 return results;
             }''')
 
-            print(f"[*] Quét được {len(raw_cards)} trận đấu. Đang tiến hành bóc tách luồng...")
+            print(f"[*] Quét thành công {len(raw_cards)} trận. Đang phân tích dữ liệu...")
 
             for item in raw_cards:
                 match_url = item['url']
@@ -195,69 +197,24 @@ def run_scraper():
 
                 final_logo = process_logo_url(raw_logo, team1_name, teams_title)
 
-                # Mở trang chi tiết từng trận để bắt m3u8 và kiểm tra trạng thái LIVE
-                detail_page = context.new_page()
-                m3u8_captured = []
+                # Nhận diện trạng thái trận LIVE
+                is_currently_live = bool(re.search(r'(hiệp 1|hiệp 2|hiệp phụ|h1|h2|đang đá|đang diễn ra|\d+[\'’]|live|trực tiếp)', card_text, re.I))
 
-                def handle_req(req):
-                    u = req.url
-                    if ".m3u8" in u and "blob:" not in u and u not in m3u8_captured:
-                        m3u8_captured.append(u)
-
-                detail_page.on("request", handle_req)
-
-                is_currently_live = False
-                detail_text = ""
-                try:
-                    detail_page.goto(match_url, timeout=12000, wait_until="domcontentloaded")
-                    time.sleep(1.5)
-
-                    # Kích hoạt nút Play nếu có
-                    for btn_sel in ["button:has-text('HD1')", "button:has-text('HD2')", ".vjs-big-play-button", "iframe", ".play-btn"]:
-                        try:
-                            el = detail_page.query_selector(btn_sel)
-                            if el:
-                                el.click(timeout=1000)
-                                time.sleep(0.5)
-                        except Exception:
-                            pass
-
-                    detail_text = detail_page.evaluate("document.body ? document.body.innerText : ''")
-                    
-                    # Kiểm tra trạng thái LIVE
-                    if re.search(r'(hiệp 1|hiệp 2|hiệp phụ|h1|h2|đang đá|đang diễn ra|\d+[\'’])', detail_text, re.I):
-                        is_currently_live = True
-
-                except Exception:
-                    pass
-                finally:
-                    detail_page.close()
-
-                if m3u8_captured:
-                    is_currently_live = True
-
-                # Trích xuất thời gian & ngày chuẩn
-                extracted_time = parse_time_robust(match_url, f"{card_text}\n{detail_text}")
-                match_date = parse_date_info(match_url, f"{card_text}\n{detail_text}", today_str)
-                blv_name = parse_blv_name(card_text, match_url, detail_text)
+                extracted_time = parse_time_robust(match_url, card_text)
+                match_date = parse_date_info(match_url, card_text, today_str)
+                blv_name = parse_blv_name(card_text, match_url)
 
                 blv_suffix = f" ({blv_name.title()})" if blv_name else ""
                 
-                # Tạo tiêu đề chuẩn giao diện
                 if is_currently_live:
                     title_fmt = f"[{match_date} - 🔴 LIVE {extracted_time}] {teams_title}{blv_suffix}"
                 else:
                     title_fmt = f"[{match_date} - {extracted_time}] {teams_title}{blv_suffix}"
 
-                # Xác định link stream (nếu chộp được m3u8 thì dùng proxy m3u8, nếu chưa thì dùng proxy live trang)
-                if m3u8_captured:
-                    stream_url = f"https://{WORKER_DOMAIN}/proxy?url={quote(m3u8_captured[0], safe='')}"
-                else:
-                    stream_url = f"https://{WORKER_DOMAIN}/live?url={quote(match_url, safe='')}"
-
+                # Đi qua Cloudflare Worker proxy để giải mã link phát trực tiếp khi mở app
+                stream_url = f"https://{WORKER_DOMAIN}/live?url={quote(match_url, safe='')}"
                 dt_obj = parse_datetime_obj(match_date, extracted_time, vn_tz)
 
-                # BẮT BUỘC GIỮ LẠI TẤT CẢ CÁC TRẬN ĐẤU (Không xóa trận chưa có m3u8)
                 parsed_items.append({
                     "title": title_fmt,
                     "logo": final_logo,
@@ -269,7 +226,7 @@ def run_scraper():
                     "match_url": match_url
                 })
 
-            # SẮP XẾP CHUẨN: Ngày hôm nay lên đầu -> Trận 🔴 LIVE ưu tiên số 1 -> Xếp theo giờ thi đấu
+            # Sắp xếp: Ngày hôm nay -> Trận LIVE -> Thứ tự giờ đá
             parsed_items.sort(key=lambda x: (x['dt'].date(), not x['is_live'], x['dt'].time()))
 
             seen_matches = set()
@@ -286,7 +243,7 @@ def run_scraper():
                     title_tracker[raw_t] += 1
                     p_item['title'] = f"{raw_t} (SV{title_tracker[raw_t]})"
                 else:
-                    title_tracker[raw_title_key] = 1 if 'raw_title_key' in locals() else 1
+                    title_tracker[raw_t] = 1
 
                 final_list.append(p_item)
 
@@ -295,22 +252,21 @@ def run_scraper():
         finally:
             browser.close()
 
-    # Xuất Playlist M3U chuẩn kèm Header User-Agent & Referer chống lỗi link
+    # Ghi file M3U Playlist
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write('#EXTM3U tvg-shift="0"\n\n')
         for item in final_list:
             logo_attr = f'tvg-logo="{item["logo"]}"' if item["logo"] else ''
             
-            # Gắn trực tiếp Header vào cuối URL để TiviMate / OTT Navigator phát mượt 100%
-            full_playable_url = f"{item['stream_url']}|User-Agent={quote(USER_AGENT)}&Referer={quote(REFERRER_HEADER)}"
+            full_playable_url = f"{item['stream_url']}|User-Agent={USER_AGENT}&Referer={REFERRER_HEADER}"
             
             f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{item["title"]}\n')
             f.write(f'#EXTVLCOPT:http-user-agent={USER_AGENT}\n')
             f.write(f'#EXTVLCOPT:http-referrer={REFERRER_HEADER}\n')
             f.write(f'{full_playable_url}\n\n')
 
-    print(f"[*] Xuất hoàn tất {len(final_list)} trận vào file {OUTPUT_FILE}")
+    print(f"[*] Xuất thành công {len(final_list)} trận vào file {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     run_scraper()
-    0
+    
