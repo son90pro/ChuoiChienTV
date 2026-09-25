@@ -1,15 +1,13 @@
 import time
 import re
 from datetime import datetime, timezone, timedelta
-from urllib.parse import urljoin, quote
+from urllib.parse import urljoin
 from playwright.sync_api import sync_playwright
 
 BASE_URL = "https://phalang.live"
 OUTPUT_FILE = "playlist.m3u"
 GROUP_NAME = "Phá Làng TV"
 REFERRER_HEADER = "https://phalang.live/"
-WORKER_DOMAIN = "pha-lang-iptv.sonnguyen90pro.workers.dev"
-
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
 # Bảng tra cứu cờ quốc gia chuẩn hóa
@@ -59,15 +57,11 @@ def process_logo_url(raw_logo: str, team1_name: str, teams_title: str) -> str:
 def parse_time_robust(url: str, text: str) -> str:
     text_time = re.search(r'\b(2[0-3]|[0-1]?\d)[:h](\d{2})\b', text, re.I)
     if text_time:
-        hh = text_time.group(1).zfill(2)
-        mm = text_time.group(2)
-        return f"{hh}:{mm}"
+        return f"{text_time.group(1).zfill(2)}:{text_time.group(2)}"
 
     url_luc_4 = re.search(r'(?:luc|time)?[-_]?(2[0-3]|[0-1]\d)(\d{2})', url, re.I)
     if url_luc_4:
-        hh = url_luc_4.group(1).zfill(2)
-        mm = url_luc_4.group(2)
-        return f"{hh}:{mm}"
+        return f"{url_luc_4.group(1).zfill(2)}:{url_luc_4.group(2)}"
 
     return "00:00"
 
@@ -75,13 +69,11 @@ def parse_date_info(url: str, text: str, default_date: str) -> str:
     try:
         date_match = re.search(r'ngay-(\d{1,2})[-_](\d{1,2})', url, re.I)
         if date_match:
-            d, m = date_match.group(1).zfill(2), date_match.group(2).zfill(2)
-            return f"{d}/{m}"
+            return f"{date_match.group(1).zfill(2)}/{date_match.group(2).zfill(2)}"
             
         text_date_match = re.search(r'\b(\d{1,2})[/.-](\d{1,2})\b', text)
         if text_date_match:
-            d, m = text_date_match.group(1).zfill(2), text_date_match.group(2).zfill(2)
-            return f"{d}/{m}"
+            return f"{text_date_match.group(1).zfill(2)}/{text_date_match.group(2).zfill(2)}"
     except Exception:
         pass
     return default_date
@@ -111,7 +103,6 @@ def parse_datetime_obj(date_str: str, time_str: str, vn_tz) -> datetime:
         return datetime(2099, 1, 1, 0, 0, tzinfo=vn_tz)
 
 def extract_stream_m3u8(context, match_url):
-    """Trích xuất chính xác luồng .m3u8 từ iframe và các gói tin mạng"""
     page = context.new_page()
     captured_urls = []
     
@@ -126,7 +117,6 @@ def extract_stream_m3u8(context, match_url):
         page.goto(match_url, timeout=12000, wait_until="domcontentloaded")
         time.sleep(1.5)
 
-        # Kích hoạt trình phát video
         for selector in ["iframe", "video", ".play-btn", "button:has-text('HD1')", "button:has-text('HD2')", ".vjs-big-play-button"]:
             try:
                 el = page.query_selector(selector)
@@ -141,7 +131,6 @@ def extract_stream_m3u8(context, match_url):
                 break
             time.sleep(0.4)
 
-        # Quét iframe nếu mạng chưa chộp kịp
         if not captured_urls:
             for frame in page.frames:
                 try:
@@ -222,7 +211,7 @@ def run_scraper():
             }''')
 
             page.close()
-            print(f"[*] Quét thành công {len(raw_cards)} trận. Đang bóc tách luồng .m3u8...")
+            print(f"[*] Quét thành công {len(raw_cards)} trận. Đang bóc tách luồng trực tiếp...")
 
             for item in raw_cards:
                 match_url = item['url']
@@ -246,8 +235,6 @@ def run_scraper():
                     teams_title = "Trận đấu Trực Tiếp"
 
                 final_logo = process_logo_url(raw_logo, team1_name, teams_title)
-
-                # Bắt luồng .m3u8 thực sự
                 m3u8_url = extract_stream_m3u8(context, match_url)
 
                 is_currently_live = bool(m3u8_url) or bool(re.search(r'(hiệp 1|hiệp 2|hiệp phụ|h1|h2|đang đá|đang diễn ra|\d+[\'’])', card_text, re.I))
@@ -263,11 +250,8 @@ def run_scraper():
                 else:
                     title_fmt = f"[{match_date} - {extracted_time}] {teams_title}{blv_suffix}"
 
-                # Đi qua Cloudflare Worker Rewrite M3U8
-                if m3u8_url:
-                    stream_link = f"https://{WORKER_DOMAIN}/?url={quote(m3u8_url, safe='')}"
-                else:
-                    stream_link = f"https://{WORKER_DOMAIN}/?url={quote(match_url, safe='')}"
+                # Link phát trực tiếp gốc
+                stream_link = m3u8_url if m3u8_url else match_url
 
                 dt_obj = parse_datetime_obj(match_date, extracted_time, vn_tz)
 
@@ -307,17 +291,19 @@ def run_scraper():
         finally:
             browser.close()
 
-    # Ghi file M3U Playlist
+    # Ghi file M3U Playlist với cú pháp Header đa năng
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write('#EXTM3U tvg-shift="0"\n\n')
         for item in final_list:
             logo_attr = f'tvg-logo="{item["logo"]}"' if item["logo"] else ''
             
-            full_playable_url = f"{item['stream_link']}|User-Agent={USER_AGENT}&Referer={REFERRER_HEADER}"
+            # Đính kèm Referer trực tiếp vào đuôi URL
+            full_playable_url = f"{item['stream_link']}|Referer={REFERRER_HEADER}&User-Agent={USER_AGENT}"
             
             f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{item["title"]}\n')
             f.write(f'#EXTVLCOPT:http-user-agent={USER_AGENT}\n')
             f.write(f'#EXTVLCOPT:http-referrer={REFERRER_HEADER}\n')
+            f.write(f'#EXTHTTP:{{"urls":["(.*)"],"headers":{{"Referer":"{REFERRER_HEADER}","User-Agent":"{USER_AGENT}"}}}}\n')
             f.write(f'{full_playable_url}\n\n')
 
     print(f"[*] Xuất thành công {len(final_list)} trận vào file {OUTPUT_FILE}")
