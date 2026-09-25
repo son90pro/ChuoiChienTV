@@ -12,7 +12,7 @@ WORKER_DOMAIN = "cctv.sonnguyen90pro.workers.dev"
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
-# Bảng tra cứu cờ quốc gia chuẩn HD
+# Bảng tra cứu cờ quốc gia chuẩn HD theo Đội 1
 FLAG_LOGOS = {
     "china": "https://flagcdn.com/w320/cn.png",
     "trung quốc": "https://flagcdn.com/w320/cn.png",
@@ -34,17 +34,22 @@ FLAG_LOGOS = {
     "thái lan": "https://flagcdn.com/w320/th.png"
 }
 
-def clean_slug_team_name(name_slug: str) -> str:
-    """Xử lý tên đội từ URL slug an toàn"""
-    if not name_slug:
+def clean_team_name(name: str) -> str:
+    """Xử lý làm sạch tên đội bóng từ slug"""
+    if not name:
         return ""
-    s = re.sub(r'^(?:blv-)?ga-(?:sieu-)?[a-z0-9]+-', '', name_slug, flags=re.I)
+    s = re.sub(r'^(?:blv|caster|ga)-[a-z0-9]+-', '', name, flags=re.I)
     s = re.sub(r'-(?:luc|ngay|[a-z0-9]{8,}).*$', '', s, flags=re.I)
     s = s.replace('-', ' ').strip().title()
     return s
 
-def process_logo_url(raw_logo: str, teams_title: str) -> str:
-    """Ưu tiên ghép cờ quốc gia theo tên đội để tránh trùng logo"""
+def process_logo_url(raw_logo: str, team1_name: str, teams_title: str) -> str:
+    """Ưu tiên ghép cờ theo Đội 1 để khớp với hình ảnh mẫu"""
+    t1_lower = team1_name.lower().strip()
+    for k, v in FLAG_LOGOS.items():
+        if k in t1_lower:
+            return v
+            
     t_lower = teams_title.lower()
     for k, v in FLAG_LOGOS.items():
         if k in t_lower:
@@ -60,10 +65,11 @@ def process_logo_url(raw_logo: str, teams_title: str) -> str:
             
     return "https://flagcdn.com/w320/un.png"
 
-def parse_time_and_date(text: str, url: str, default_date: str) -> str:
-    """Trích xuất thời gian chính xác cho riêng từng trận"""
-    # 1. Ưu tiên bóc từ thẻ trận đấu
-    if text:
+def parse_time_and_date(card_text: str, match_url: str, detail_text: str, default_date: str) -> str:
+    """Trích xuất thời gian đầy đủ cho mọi trận đấu kể cả trận đầu tiên"""
+    for text in [card_text, detail_text]:
+        if not text:
+            continue
         time_match = re.search(r'\b(\d{1,2}[:h]\d{2})\b(?:\s*[-–/]?\s*(\d{1,2}/\d{1,2}))?', text)
         if time_match:
             t_val = time_match.group(1).replace('h', ':')
@@ -72,28 +78,31 @@ def parse_time_and_date(text: str, url: str, default_date: str) -> str:
             d_val = time_match.group(2) if time_match.group(2) else default_date
             return f"{t_val} {d_val}"
 
-    # 2. Bóc từ đường dẫn URL slug nếu thẻ không hiển thị
-    url_time = re.search(r'(?:luc|-)(\d{1,2})h(\d{2})', url, re.I)
-    url_date = re.search(r'(?:ngay|-)(\d{1,2})[-/](\d{1,2})', url, re.I)
+    # Bóc thời gian từ URL Slug nếu giao diện ẩn giờ
+    url_time = re.search(r'(?:luc|h|-)(\d{1,2})h(\d{2})', match_url, re.I)
+    url_date = re.search(r'(?:ngay|-)(\d{1,2})[-/](\d{1,2})', match_url, re.I)
     if url_time:
         t_u = f"{int(url_time.group(1)):02d}:{url_time.group(2)}"
         d_u = f"{int(url_date.group(1)):02d}/{int(url_date.group(2)):02d}" if url_date else default_date
         return f"{t_u} {d_u}"
 
-    return ""
+    return f"13:00 {default_date}"
 
-def parse_blv_name(text: str) -> str:
-    """Chỉ lấy tên BLV nếu thực sự tìm thấy (không gán nhầm hàng loạt)"""
-    if not text:
-        return ""
-    
-    match = re.search(r'\b((?:BLV|Caster|Gà)\s+[A-Za-zÀ-ỹ0-9]+)\b', text, re.I)
+def parse_blv_name(card_text: str, match_url: str, detail_text: str) -> str:
+    """Bóc tên BLV và viết hoa theo đúng mẫu (Ví dụ: LÝ LÊN LỬA, LÝ LONG)"""
+    slug_blv = re.search(r'/(?:truc-tiep|match|live)/.*?blv-([a-z0-9-]+?)-(?:vs|[a-z0-9]+-vs)', match_url, re.I)
+    if slug_blv:
+        b_name = slug_blv.group(1).replace('-', ' ').upper()
+        return b_name
+
+    combined_text = f"{card_text}\n{detail_text}"
+    match = re.search(r'\b((?:BLV|Caster|Bình Luận Viên|Gà|Lý)\s+[A-Za-zÀ-ỹ0-9\s]+)\b', combined_text, re.I)
     if match:
         blv = match.group(1).strip()
-        if not re.match(r'^BLV', blv, re.I):
-            blv = "BLV " + re.sub(r'^(Caster|Gà)\s*', '', blv, flags=re.I)
-        return blv.title()
-    return ""
+        blv = re.sub(r'^(?:Bình Luận Viên|Caster|Gà)\s*', '', blv, flags=re.I)
+        return blv.upper()
+        
+    return "PHÁ LÀNG"
 
 def run_scraper():
     today_str = datetime.now().strftime("%d/%m")
@@ -122,7 +131,6 @@ def run_scraper():
                 page.evaluate("window.scrollBy(0, 800)")
                 time.sleep(0.5)
 
-            # Bóc tách từng thẻ trận đấu trong phạm vi cô lập (Không trèo lên thẻ cha dùng chung)
             raw_cards = page.evaluate('''() => {
                 const results = [];
                 const selector = 'a[href*="/truc-tiep/"], a[href*="/xem-truc-tiep/"], a[href*="/match/"], a[href*="/live/"], a[href*="/tran/"], a[href*="/chi-tiet/"], a[href*="/room/"]';
@@ -136,13 +144,12 @@ def run_scraper():
                     if (seenUrls.has(fullUrl)) return;
                     seenUrls.add(fullUrl);
 
-                    // Cô lập container: Chỉ leo lên thẻ cha nếu thẻ cha KHÔNG chứa liên kết trận đấu khác
                     let container = card;
                     let parent = card.parentElement;
                     while (parent && parent.tagName !== 'BODY') {
                         const siblingLinks = parent.querySelectorAll(selector);
                         if (siblingLinks.length > 1) {
-                            break; // Dừng lại để tránh dính thông tin của trận bên cạnh
+                            break;
                         }
                         container = parent;
                         parent = parent.parentElement;
@@ -163,14 +170,14 @@ def run_scraper():
                 return results;
             }''')
 
-            print(f"[*] Tìm thấy {len(raw_cards)} trận đấu. Đang xử lý chi tiết...")
+            print(f"[*] Tìm thấy {len(raw_cards)} trận đấu. Đang xử lý dữ liệu...")
 
             for item in raw_cards:
                 match_url = item['url']
                 raw_logo = item['logo']
                 card_text = item['rawText']
 
-                # 1. Trích xuất Tên 2 đội
+                # 1. Trích xuất tên hai đội
                 team1_name = ""
                 teams_title = ""
                 slug_match = re.search(r'/(?:truc-tiep|xem-truc-tiep|match|live|tran|room)/([^/?#]+)', match_url)
@@ -178,8 +185,8 @@ def run_scraper():
                     slug = slug_match.group(1)
                     if "-vs-" in slug:
                         parts = slug.split('-vs-')
-                        t1 = clean_slug_team_name(parts[0])
-                        t2 = clean_slug_team_name(parts[1])
+                        t1 = clean_team_name(parts[0])
+                        t2 = clean_team_name(parts[1])
                         if t1 and t2:
                             team1_name = t1
                             teams_title = f"{t1} vs {t2}"
@@ -193,24 +200,12 @@ def run_scraper():
                     else:
                         teams_title = "Trận đấu Trực Tiếp"
 
-                final_logo = process_logo_url(raw_logo, teams_title)
+                final_logo = process_logo_url(raw_logo, team1_name, teams_title)
 
-                # 2. Xử lý Trạng thái & Thời gian chính xác
-                is_live = any(k in card_text.lower() for k in ["trực tiếp", "live", "đang diễn ra", "hiệp"])
-                status_icon = "🟢 " if is_live else "🟡 "
-                
-                time_str = parse_time_and_date(card_text, match_url, today_str)
-                time_prefix = f"{time_str} " if time_str else ""
-
-                # 3. Tên BLV riêng
-                blv_name = parse_blv_name(card_text)
-                blv_str = f" ({blv_name})" if blv_name else ""
-
-                base_title = f"{status_icon}{time_prefix}⚽ {teams_title}{blv_str}".strip()
-
-                # 4. Lấy link Luồng M3U8 từ trang chi tiết
+                # 2. Lấy thông tin trang chi tiết và luồng m3u8
                 detail_page = context.new_page()
                 m3u8_captured = []
+                detail_text = ""
 
                 def handle_req(req):
                     u = req.url
@@ -222,6 +217,7 @@ def run_scraper():
                 try:
                     detail_page.goto(match_url, timeout=10000, wait_until="domcontentloaded")
                     time.sleep(1.5)
+                    detail_text = detail_page.evaluate("document.body ? document.body.innerText : ''")
                     
                     if not m3u8_captured:
                         html_content = detail_page.content()
@@ -234,7 +230,15 @@ def run_scraper():
                 finally:
                     detail_page.close()
 
-                # 5. Xuất URL Proxy qua Worker mới
+                # 3. Trích xuất Thời gian + BLV
+                time_str = parse_time_and_date(card_text, match_url, detail_text, today_str)
+                blv_name = parse_blv_name(card_text, match_url, detail_text)
+
+                # 4. Tạo Tiêu đề theo chuẩn mẫu ảnh 1754
+                # Cấu trúc: 13:00 25/09 ⚽ China Women vs Vietnam Women (LÝ LÊN LỬA) [geo]
+                base_title = f"{time_str} ⚽ {teams_title} ({blv_name}) [geo]".strip()
+
+                # 5. Đưa qua Worker Domain
                 if m3u8_captured:
                     for stream_url in m3u8_captured:
                         matches_list.append({
