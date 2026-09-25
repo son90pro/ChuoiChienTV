@@ -1,0 +1,52 @@
+#EXTM3U tvg-shift="0"
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/my.png" group-title="Phá Làng TV",[25/09 - 16:00] Bangladesh vs Malaysia
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+#EXTVLCOPT:http-referrer=https://phalang.live/
+https://chuoi-chien-iptv.sonnguyen90pro.workers.dev/proxy?url=https%3A%2F%2Fpull.digitalcdn.net%2Flive%2F098bfecd1059454c89a375f33bde0c68%2Findex.m3u8|User-Agent=Mozilla/5.0&Referer=https://phalang.live/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/br.png" group-title="Phá Làng TV",[25/09 - 17:00] Australia vs Brazil
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+#EXTVLCOPT:http-referrer=https://phalang.live/
+https://chuoi-chien-iptv.sonnguyen90pro.workers.dev/proxy?url=https%3A%2F%2Fpull.digitalcdn.net%2Flive%2F4192d2db050a4e4dacfed6c8a10fbfc7%2Findex.m3u8|User-Agent=Mozilla/5.0&Referer=https://phalang.live/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/jp.png" group-title="Phá Làng TV",[25/09 - 17:30] Japan Women vs Philippines Women
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+#EXTVLCOPT:http-referrer=https://phalang.live/
+https://chuoi-chien-iptv.sonnguyen90pro.workers.dev/proxy?url=https%3A%2F%2Fpull.digitalcdn.net%2Flive%2F857a7c7381854c178d8c07f6f389c727%2Findex.m3u8|User-Agent=Mozilla/5.0&Referer=https://phalang.live/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/vn.png" group-title="Phá Làng TV",[25/09 - 17:30] South Korea U23 vs Vietnam U23
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+#EXTVLCOPT:http-referrer=https://phalang.live/
+https://chuoi-chien-iptv.sonnguyen90pro.workers.dev/proxy?url=https%3A%2F%2Fpull.digitalcdn.net%2Flive%2F747d5240fe3b449a86252ad5fcd74559%2Findex.m3u8|User-Agent=Mozilla/5.0&Referer=https://phalang.live/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/id.png" group-title="Phá Làng TV",[25/09 - 20:00] Indonesia vs Singapore
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+#EXTVLCOPT:http-referrer=https://phalang.live/
+https://chuoi-chien-iptv.sonnguyen90pro.workers.dev/live?url=https%3A%2F%2Fphalang.live%2Ftruc-tiep%2Findonesia-vs-singapore-dn1m1ghl6xn4moe|User-Agent=Mozilla/5.0&Referer=https://phalang.live/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/un.png" group-title="Phá Làng TV",[25/09 - 21:00] India vs Panama
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+#EXTVLCOPT:http-referrer=https://phalang.live/
+https://chuoi-chien-iptv.sonnguyen90pro.workers.dev/live?url=https%3A%2F%2Fphalang.live%2Ftruc-tiep%2Findia-vs-panama-n54qllh459lwqvy|User-Agent=Mozilla/5.0&Referer=https://phalang.live/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/un.png" group-title="Phá Làng TV",[25/09 - 23:00] Georgia vs Northern Ireland
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+#EXTVLCOPT:http-referrer=https://phalang.live/
+https://chuoi-chien-iptv.sonnguyen90pro.workers.dev/live?url=https%3A%2F%2Fphalang.live%2Ftruc-tiep%2Fgeorgia-vs-northern-ireland-dn1m1ghl9y77moe|User-Agent=Mozilla/5.0&Referer=https://phalang.live/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/un.png" group-title="Phá Làng TV",[26/09 - 00:00] Hammarby Tff vs Ifk Stocksund
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+#EXTVLCOPT:http-referrer=https://phalang.live/
+https://chuoi-chien-iptv.sonnguyen90pro.workers.dev/live?url=https%3A%2F%2Fphalang.live%2Ftruc-tiep%2Fhammarby-tff-vs-ifk-stocksund-vjxm8ghe56j6r6o|User-Agent=Mozilla/5.0&Referer=https://phalang.live/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/fr.png" group-title="Phá Làng TV",[26/09 - 01:45] Turkiye vs France
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+#EXTVLCOPT:http-referrer=https://phalang.live/
+https://chuoi-chien-iptv.sonnguyen90pro.workers.dev/live?url=https%3A%2F%2Fphalang.live%2Ftruc-tiep%2Fturkiye-vs-france-jw2r09hk5y92rz8|User-Agent=Mozilla/5.0&Referer=https://phalang.live/
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/it.png" group-title="Phá Làng TV",[26/09 - 01:45] Italy vs Belgium
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+#EXTVLCOPT:http-referrer=https://phalang.live/
+https://chuoi-chien-iptv.sonnguyen90pro.workers.dev/live?url=https%3A%2F%2Fphalang.live%2Ftruc-tiep%2Fitaly-vs-belgium-l5ergph4kxylr8k|User-Agent=Mozilla/5.0&Referer=https://phalang.live/
+
