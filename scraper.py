@@ -6,7 +6,7 @@ from urllib.parse import quote
 from playwright.sync_api import sync_playwright
 
 WORKER_DOMAIN = "chuoi-chien-iptv.sonnguyen90pro.workers.dev"
-BASE_URL = "https://phalang.live"
+BASE_URL = "https://phalang.tv"
 OUTPUT_FILE = "playlist.m3u"
 
 # Tên nhóm danh mục hiển thị trên ứng dụng IPTV
