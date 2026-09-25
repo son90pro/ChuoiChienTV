@@ -102,7 +102,8 @@ def parse_datetime_obj(date_str: str, time_str: str, vn_tz) -> datetime:
     except Exception:
         return datetime(2099, 1, 1, 0, 0, tzinfo=vn_tz)
 
-def extract_stream_m3u8(context, match_url):
+def extract_all_m3u8_streams(context, match_url):
+    """Bắt toàn bộ các luồng .m3u8 (HD1, HD2, Nhà đài...) của trận đấu"""
     page = context.new_page()
     captured_urls = []
     
@@ -117,16 +118,17 @@ def extract_stream_m3u8(context, match_url):
         page.goto(match_url, timeout=12000, wait_until="domcontentloaded")
         time.sleep(1.5)
 
-        for selector in ["iframe", "video", ".play-btn", "button:has-text('HD1')", "button:has-text('HD2')", ".vjs-big-play-button"]:
+        # Click kích hoạt các Server/Nút xem HD1, HD2
+        for selector in ["button:has-text('HD1')", "button:has-text('HD2')", "iframe", "video", ".play-btn"]:
             try:
-                el = page.query_selector(selector)
-                if el:
-                    el.click(timeout=1000)
-                    time.sleep(0.5)
+                elements = page.query_selector_all(selector)
+                for el in elements:
+                    el.click(timeout=800)
+                    time.sleep(0.4)
             except Exception:
                 pass
 
-        for _ in range(6):
+        for _ in range(5):
             if captured_urls:
                 break
             time.sleep(0.4)
@@ -147,7 +149,7 @@ def extract_stream_m3u8(context, match_url):
     finally:
         page.close()
 
-    return captured_urls[0] if captured_urls else ""
+    return captured_urls
 
 def run_scraper():
     vn_tz = timezone(timedelta(hours=7))
@@ -211,7 +213,7 @@ def run_scraper():
             }''')
 
             page.close()
-            print(f"[*] Quét thành công {len(raw_cards)} trận. Đang bóc tách luồng trực tiếp...")
+            print(f"[*] Quét thành công {len(raw_cards)} trận. Đang bóc tách link stream .m3u8...")
 
             for item in raw_cards:
                 match_url = item['url']
@@ -235,9 +237,11 @@ def run_scraper():
                     teams_title = "Trận đấu Trực Tiếp"
 
                 final_logo = process_logo_url(raw_logo, team1_name, teams_title)
-                m3u8_url = extract_stream_m3u8(context, match_url)
 
-                is_currently_live = bool(m3u8_url) or bool(re.search(r'(hiệp 1|hiệp 2|hiệp phụ|h1|h2|đang đá|đang diễn ra|\d+[\'’])', card_text, re.I))
+                # Lấy danh sách link .m3u8 thực tế
+                m3u8_streams = extract_all_m3u8_streams(context, match_url)
+
+                is_currently_live = bool(m3u8_streams) or bool(re.search(r'(hiệp 1|hiệp 2|hiệp phụ|h1|h2|đang đá|đang diễn ra|\d+[\'’])', card_text, re.I))
 
                 extracted_time = parse_time_robust(match_url, card_text)
                 match_date = parse_date_info(match_url, card_text, today_str)
@@ -245,45 +249,35 @@ def run_scraper():
 
                 blv_suffix = f" ({blv_name.title()})" if blv_name else ""
                 
-                if is_currently_live:
-                    title_fmt = f"[{match_date} - 🔴 LIVE {extracted_time}] {teams_title}{blv_suffix}"
-                else:
-                    title_fmt = f"[{match_date} - {extracted_time}] {teams_title}{blv_suffix}"
-
-                # Link phát trực tiếp gốc
-                stream_link = m3u8_url if m3u8_url else match_url
+                live_tag = "🟢 " if is_currently_live else ""
+                base_title = f"{live_tag}{extracted_time} {match_date} ⚽ {teams_title}{blv_suffix}"
 
                 dt_obj = parse_datetime_obj(match_date, extracted_time, vn_tz)
 
-                parsed_items.append({
-                    "title": title_fmt,
-                    "logo": final_logo,
-                    "stream_link": stream_link,
-                    "is_live": is_currently_live,
-                    "date": match_date,
-                    "time": extracted_time,
-                    "dt": dt_obj,
-                    "match_url": match_url
-                })
+                # Nếu bắt được nhiều link .m3u8 (Server 1, Server 2 / HD2)
+                if m3u8_streams:
+                    for idx, s_url in enumerate(m3u8_streams):
+                        srv_tag = f" (HD{idx+2})" if idx > 0 else ""
+                        parsed_items.append({
+                            "title": f"{base_title}{srv_tag}",
+                            "logo": final_logo,
+                            "stream_url": s_url,
+                            "is_live": is_currently_live,
+                            "date": match_date,
+                            "time": extracted_time,
+                            "dt": dt_obj,
+                            "match_url": f"{match_url}#srv{idx}"
+                        })
 
             parsed_items.sort(key=lambda x: (x['dt'].date(), not x['is_live'], x['dt'].time()))
 
             seen_matches = set()
             final_list = []
-            title_tracker = {}
 
             for p_item in parsed_items:
                 if p_item['match_url'] in seen_matches:
                     continue
                 seen_matches.add(p_item['match_url'])
-
-                raw_t = p_item['title']
-                if raw_t in title_tracker:
-                    title_tracker[raw_t] += 1
-                    p_item['title'] = f"{raw_t} (SV{title_tracker[raw_t]})"
-                else:
-                    title_tracker[raw_t] = 1
-
                 final_list.append(p_item)
 
         except Exception as e:
@@ -291,23 +285,17 @@ def run_scraper():
         finally:
             browser.close()
 
-    # Ghi file M3U Playlist với cú pháp Header đa năng
+    # Ghi file M3U Playlist ĐÚNG CHUẨN MẪU ĐANG CHẠY TỐT
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        f.write('#EXTM3U tvg-shift="0"\n\n')
+        f.write('#EXTM3U\n\n')
         for item in final_list:
             logo_attr = f'tvg-logo="{item["logo"]}"' if item["logo"] else ''
             
-            # Đính kèm Referer trực tiếp vào đuôi URL
-            full_playable_url = f"{item['stream_link']}|Referer={REFERRER_HEADER}&User-Agent={USER_AGENT}"
-            
-            f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}",{item["title"]}\n')
-            f.write(f'#EXTVLCOPT:http-user-agent={USER_AGENT}\n')
+            f.write(f'#EXTINF:-1 {logo_attr} group-title="{GROUP_NAME}" , {item["title"]} \n')
             f.write(f'#EXTVLCOPT:http-referrer={REFERRER_HEADER}\n')
-            f.write(f'#EXTHTTP:{{"urls":["(.*)"],"headers":{{"Referer":"{REFERRER_HEADER}","User-Agent":"{USER_AGENT}"}}}}\n')
-            f.write(f'{full_playable_url}\n\n')
+            f.write(f'{item["stream_url"]}\n\n')
 
     print(f"[*] Xuất thành công {len(final_list)} trận vào file {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     run_scraper()
-    
