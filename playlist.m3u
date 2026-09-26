@@ -1,31 +1,16 @@
 #EXTM3U
 
-#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/vn.png" group-title="Chuối Chiên TV" , 🟢 19:30 26/09 ⚽ Việt Nam vs Philippines (Trốc Tru) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://stm9ee346727718.stream.hdplaylink.com/cctvlive/troctruhd/playlist.m3u8
-
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115700_a0fcd4fe.png" group-title="Chuối Chiên TV" , 🟢 20:00 26/09 ⚽ Slovenia vs Scotland (Chuối Lá) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoilahd/playlist.m3u8
-
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_120144_c5f585be.png" group-title="Chuối Chiên TV" , 🟢 20:00 26/09 ⚽ Africa Cup of Nations - Qualification vs South Africa (Chuối Chao) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoichaohd/playlist.m3u8
-
-#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/sk.png" group-title="Chuối Chiên TV" , 🟢 22:00 26/09 🏐 Vô địch Châu Âu Bóng Chuyền vs Slovakia W (Chuối Tây) [FHD] [hls] 
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/fi.png" group-title="Chuối Chiên TV" , 🟢 22:02 26/09 🏐 Vô địch Châu Âu Bóng Chuyền vs Finland (Chuối Tây) [FHD] [hls] 
 #EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
 #EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
 https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoitayhd/playlist.m3u8
 
-#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/fi.png" group-title="Chuối Chiên TV" , 🟢 23:00 26/09 ⚽ San Marino vs Finland (Chuối Sấy) [FHD] [hls] 
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115700_a0fcd4fe.png" group-title="Chuối Chiên TV" , 🟢 23:00 26/09 ⚽ Hết vs San Marino (Chuối Sấy) [FHD] [hls] 
 #EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
 #EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
 https://gckc0525.edgemaxcdn.org/live/chuoisayhd/playlist.m3u8
 
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115700_a0fcd4fe.png" group-title="Chuối Chiên TV" , 🟢 23:00 26/09 ⚽ Iceland vs Estonia (Chuối Lá) [FHD] [hls] 
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115700_a0fcd4fe.png" group-title="Chuối Chiên TV" , 🟢 23:00 26/09 ⚽ Hết vs Iceland (Chuối Lá) [FHD] [hls] 
 #EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
 #EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
 https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoilahd/playlist.m3u8
@@ -44,4 +29,19 @@ https://stm9ee346727718.stream.hdplaylink.com/cctvlive/troctruhd/playlist.m3u8
 #EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
 #EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
 https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoingaohd/playlist.m3u8
+
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115700_a0fcd4fe.png" group-title="Chuối Chiên TV" , 🟢 01:45 27/09 ⚽ FYR Macedonia vs Switzerland (Chuối Lá) [FHD] [hls] 
+#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoilahd/playlist.m3u8
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/fr.png" group-title="Chuối Chiên TV" , 🟢 02:00 27/09 🏐 Vô địch Châu Âu Bóng Chuyền vs France (Chuối Kem) [FHD] [hls] 
+#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoikemhd/playlist.m3u8
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/co.png" group-title="Chuối Chiên TV" , 🟢 04:00 27/09 ⚽ Colombia vs Deportivo Pereira (Trốc Tru) [FHD] [hls] 
+#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+https://stm9ee346727718.stream.hdplaylink.com/cctvlive/troctruhd/playlist.m3u8
 
