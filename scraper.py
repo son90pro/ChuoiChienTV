@@ -59,7 +59,7 @@ LOGOS = {
     "hungary": "https://flagcdn.com/w320/hu.png", "hungari": "https://flagcdn.com/w320/hu.png", "ukraine": "https://flagcdn.com/w320/ua.png",
     "finland": "https://flagcdn.com/w320/fi.png", "phần lan": "https://flagcdn.com/w320/fi.png",
     "sweden": "https://flagcdn.com/w320/se.png", "thụy điển": "https://flagcdn.com/w320/se.png",
-    "romania": "https://flagcdn.com/w320/ro.png",
+    "romania": "https://flagcdn.com/w320/ro.png", "croatia": "https://flagcdn.com/w320/hr.png",
 
     # Châu Á & Đông Nam Á
     "vietnam": "https://flagcdn.com/w320/vn.png", "việt nam": "https://flagcdn.com/w320/vn.png",
@@ -72,13 +72,14 @@ LOGOS = {
     "singapore": "https://flagcdn.com/w320/sg.png", "bangladesh": "https://flagcdn.com/w320/bd.png",
     "australia": "https://flagcdn.com/w320/au.png", "úc": "https://flagcdn.com/w320/au.png",
 
-    # Mỹ & Châu Phi
+    # Mỹ & Châu Phi & Các CLB
     "panama": "https://flagcdn.com/w320/pa.png", "jamaica": "https://flagcdn.com/w320/jm.png",
     "guatemala": "https://flagcdn.com/w320/gt.png", "morocco": "https://flagcdn.com/w320/ma.png", "ma rốc": "https://flagcdn.com/w320/ma.png",
-    "gabon": "https://flagcdn.com/w320/ga.png", "colombia": "https://flagcdn.com/w320/co.png", "chico": "https://flagcdn.com/w320/co.png",
+    "gabon": "https://flagcdn.com/w320/ga.png", "colombia": "https://flagcdn.com/w320/co.png", "chico": "https://flagcdn.com/w320/co.png", "pasto": "https://flagcdn.com/w320/co.png",
     "mexico": "https://flagcdn.com/w320/mx.png", "atlante": "https://flagcdn.com/w320/mx.png", "tijuana": "https://flagcdn.com/w320/mx.png", "monterrey": "https://flagcdn.com/w320/mx.png", "atlas": "https://flagcdn.com/w320/mx.png",
     "brazil": "https://flagcdn.com/w320/br.png", "argentina": "https://flagcdn.com/w320/ar.png",
-    "uruguay": "https://flagcdn.com/w320/uy.png", "ecuador": "https://flagcdn.com/w320/ec.png"
+    "uruguay": "https://flagcdn.com/w320/uy.png", "ecuador": "https://flagcdn.com/w320/ec.png",
+    "jaca": "https://flagcdn.com/w320/jp.png", "j3": "https://flagcdn.com/w320/jp.png"
 }
 
 def to_slug(text: str) -> str:
@@ -96,7 +97,7 @@ def clean_word(w: str) -> str:
     return w.capitalize()
 
 def parse_teams_from_slug(url: str) -> str:
-    """Bóc tách tên 2 đội từ đường dẫn URL slug"""
+    """Bóc tách tên 2 đội chính xác từ đường dẫn URL slug"""
     try:
         match_slug = re.search(r'/(?:truc-tiep|match|live|room|xem|phong|link|stream)/([^/?#]+)', url)
         if not match_slug:
@@ -108,7 +109,7 @@ def parse_teams_from_slug(url: str) -> str:
 
             left = re.sub(r'^(?:blv|caster|ga|ly)[-_]*', '', left, flags=re.I)
             
-            # Loại bỏ các từ khóa tên BLV dính ở đầu slug
+            # Loại bỏ danh sách các từ khóa tên BLV dính ở đầu slug
             caster_words = [
                 "troc", "tru", "chuoi", "nho", "kem", "say", "sais", "chao", 
                 "la", "ngao", "to", "tay", "lap", "ky", "beo", "sieu", "ga", "ly"
@@ -119,6 +120,7 @@ def parse_teams_from_slug(url: str) -> str:
 
             left = re.sub(r'^(?:truc-tiep|xem-truc-tiep|match|live)[-_]*', '', left, flags=re.I)
 
+            # Loại bỏ thông số ngày giờ dính ở đuôi URL
             right = re.sub(r'-(?:luc|ngay|time|fhd|hls|\d{2}h\d{2}|\d{3,4}|\d{1,2}-\d{1,2}|\d{4}).*$', '', right, flags=re.I)
             right = re.sub(r'-\d+$', '', right)
 
@@ -134,14 +136,57 @@ def parse_teams_from_slug(url: str) -> str:
         pass
     return ""
 
+def extract_teams_from_lines(card_text: str) -> str:
+    """Bóc tách tên 2 đội từ văn bản thô khi URL không chứa từ khóa -vs-"""
+    lines = [line.strip() for line in card_text.split('\n') if line.strip()]
+    candidates = []
+    
+    junk_patterns = [
+        r'\b\d{1,2}[:h/]\d{2}\b', r'\b\d{1,2}/\d{1,2}\b',
+        r'\b(?:fhd|hls|live|trực tiếp|đang diễn ra|sắp diễn ra|hiệp 1|hiệp 2|hoàn tất|kết thúc)\b',
+        r'\b(?:chuối|trốc|blv|caster)\s+[a-zA-Z0-9_À-ỹ]+\b',
+        r'^\s*(?:chuối|trốc|blv|caster)\s*$'
+    ]
+
+    for line in lines:
+        l_clean = line
+        for pat in junk_patterns:
+            l_clean = re.sub(pat, '', l_clean, flags=re.I).strip()
+            
+        if not l_clean or len(l_clean) < 2:
+            continue
+            
+        l_low = l_clean.lower()
+        if l_low in ['liga mx', 'meiji yasuda j3 league', 'j3 league', 'v-league', 'giao hữu quốc tế', 'uefa nations league']:
+            continue
+
+        candidates.append(l_clean)
+
+    if len(candidates) >= 2:
+        return f"{candidates[0]} vs {candidates[1]}"
+    elif len(candidates) == 1:
+        return candidates[0]
+    return ""
+
+def is_league_or_generic_logo(url: str) -> bool:
+    """Kiểm tra nếu logo thu thập được chỉ là logo giải đấu chung"""
+    if not url:
+        return True
+    u_low = url.lower()
+    junk_terms = ['liga', 'league', 'j3', 'j1', 'banner', 'default', 'icon', 'un.png', 'avatar', 'logo_league', 'comp']
+    for jt in junk_terms:
+        if jt in u_low:
+            return True
+    return False
+
 def get_team_logo(teams_str: str, raw_card_logo: str = "") -> str:
-    """Tự động tìm Logo / Cờ Quốc gia phù hợp"""
+    """Ưu tiên tìm Cờ/Logo CLB tương ứng với tên 2 đội bóng"""
     t_lower = teams_str.lower()
     for key, url in LOGOS.items():
         if key in t_lower:
             return url
 
-    if raw_card_logo and raw_card_logo.startswith("http") and "media.chuoichientv.net" in raw_card_logo and "un.png" not in raw_card_logo:
+    if raw_card_logo and raw_card_logo.startswith("http") and not is_league_or_generic_logo(raw_card_logo):
         return raw_card_logo
 
     return DEFAULT_LOGO
@@ -217,6 +262,15 @@ def run_scraper():
 
                             const text = container.innerText || a.innerText || '';
 
+                            // Lấy riêng tên 2 đội từ DOM nếu thẻ HTML chứa class tên đội bóng
+                            let team1 = '', team2 = '';
+                            const t1El = container.querySelector('.team-home, .home-team, .team1, .team-name-1');
+                            const t2El = container.querySelector('.team-away, .away-team, .team2, .team-name-2');
+                            if (t1El && t2El) {
+                                team1 = t1El.innerText.strip();
+                                team2 = t2El.innerText.strip();
+                            }
+
                             let logoUrl = '';
                             const imgs = container.querySelectorAll('img');
                             imgs.forEach(img => {
@@ -241,6 +295,8 @@ def run_scraper():
                             results.push({
                                 url: fullUrl,
                                 rawText: text,
+                                team1: team1,
+                                team2: team2,
                                 logo: logoUrl,
                                 status: status
                             });
@@ -277,8 +333,14 @@ def run_scraper():
                     blv_name = b
                     break
 
-            # 2. Bóc tách tên 2 Đội bóng chuẩn (Ưu tiên giải mã URL Slug)
-            teams_title = parse_teams_from_slug(match_url)
+            # 2. Bóc tách tên 2 Đội bóng (3 lớp ưu tiên)
+            teams_title = ""
+            if item.get('team1') and item.get('team2'):
+                teams_title = f"{item['team1']} vs {item['team2']}"
+
+            if not teams_title:
+                teams_title = parse_teams_from_slug(match_url)
+
             if not teams_title:
                 match_vs = re.search(r'([A-Za-zÀ-ỹ0-9\s\.]{2,25})\s+vs\s+([A-Za-zÀ-ỹ0-9\s\.]{2,25})', card_text, re.I)
                 if match_vs:
@@ -287,9 +349,12 @@ def run_scraper():
                     teams_title = f"{t1} vs {t2}"
 
             if not teams_title:
+                teams_title = extract_teams_from_lines(card_text)
+
+            if not teams_title:
                 teams_title = "Trận đấu Trực Tiếp"
 
-            # 3. Tự động lấy Logo / Cờ Quốc gia
+            # 3. Tự động chọn Logo / Cờ Quốc gia
             card_logo = get_team_logo(teams_title, item['logo'])
 
             # 4. Icon môn thể thao
@@ -316,7 +381,7 @@ def run_scraper():
             elif status == 'soon':
                 status_dot = "🟡 "
 
-            # Tiêu đề kênh chuẩn mẫu 1824.jpg: 🟢 21:00 25/09 ⚽ India vs Panama (Chuối Nhỏ) [FHD] [hls]
+            # Tiêu đề chuẩn hình mẫu: 🟢 08:00 26/09 ⚽ Atlante FC vs Monterrey (Chuối Chao) [FHD] [hls]
             full_title = f"{status_dot}{extracted_time} {match_date} {sport_icon} {teams_title} ({blv_name}) [FHD] [hls]"
 
             blv_slug = to_slug(blv_name)
