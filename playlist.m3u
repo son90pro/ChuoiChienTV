@@ -1,47 +1,12 @@
 #EXTM3U
 
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_112636_67ca992a.png" group-title="Chuối Chiên TV" , 🟢 23:45 15/10 ⚽ UEFA Europa League vs Lech Poznan (Chuối Nhỏ) [FHD] [hls] 
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/ar.png" group-title="Chuối Chiên TV" , 🟢 06:00 16/10 ⚽ Argentina vs Huracan (Chuối Kem) [FHD] [hls] 
 #EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
 #EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://gckc0525.edgemaxcdn.org/live/chuoinhohd/playlist.m3u8
+https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoikemhd/playlist.m3u8
 
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_112636_67ca992a.png" group-title="Chuối Chiên TV" , 🟢 23:45 15/10 ⚽ UEFA Europa League vs Lyon (Trốc Tru) [FHD] [hls] 
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/ar.png" group-title="Chuối Chiên TV" , 🟢 06:00 16/10 ⚽ Argentina vs Huracan (Chuối Kem) [FHD] [hls] 
 #EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
 #EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://stm9ee346727718.stream.hdplaylink.com/cctvlive/troctruhd/playlist.m3u8
-
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_112636_67ca992a.png" group-title="Chuối Chiên TV" , 🟢 23:45 15/10 ⚽ UEFA Europa League vs Red Bull Salzburg (Chuối Lá) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoilahd/playlist.m3u8
-
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_120122_7f994861.png" group-title="Chuối Chiên TV" , 🟢 23:45 15/10 ⚽ UEFA Europa Conference League vs CSKA Sofia (Chuối Sấy) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://gckc0525.edgemaxcdn.org/live/chuoisayhd/playlist.m3u8
-
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_112636_67ca992a.png" group-title="Chuối Chiên TV" , 🟢 02:00 16/10 ⚽ UEFA Europa League vs Benfica (Chuối Chao) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoichaohd/playlist.m3u8
-
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_112636_67ca992a.png" group-title="Chuối Chiên TV" , 🟢 02:00 16/10 ⚽ UEFA Europa League vs Bournemouth (Chuối Nhỏ) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://gckc0525.edgemaxcdn.org/live/chuoinhohd/playlist.m3u8
-
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_112636_67ca992a.png" group-title="Chuối Chiên TV" , 🟢 02:00 16/10 ⚽ UEFA Europa League vs Celta Vigo (Trốc Tru) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://stm9ee346727718.stream.hdplaylink.com/cctvlive/troctruhd/playlist.m3u8
-
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_112636_67ca992a.png" group-title="Chuối Chiên TV" , 🟢 02:00 16/10 ⚽ UEFA Europa League vs Marseille (Chuối To) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoitohd/playlist.m3u8
-
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_120122_7f994861.png" group-title="Chuối Chiên TV" , 🟢 02:00 16/10 ⚽ UEFA Europa Conference League vs Atalanta (Chuối Tây) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoitayhd/playlist.m3u8
+https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoikemhd/playlist.m3u8
 
