@@ -1,47 +1,42 @@
 #EXTM3U
 
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115953_8128716e.png" group-title="Chuối Chiên TV" , 🟢 15:00 02/11 ⚽ Ngoại Hạng Hồng Kong vs Tuv Azarganuud (Chuối Chiên) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoichienhd/playlist.m3u8
-
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115640_67566d04.png" group-title="Chuối Chiên TV" , 🟢 17:45 02/11 ⚽ Premier League vs Talant (Chuối Nhỏ) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://gckc0525.edgemaxcdn.org/live/chuoinhohd/playlist.m3u8
-
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115517_2f9af8b3.png" group-title="Chuối Chiên TV" , 🟢 19:00 02/11 ⚽ Thai League 1 vs Chonburi FC (Chuối Kem) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoikemhd/playlist.m3u8
-
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115610_bd9cc718.png" group-title="Chuối Chiên TV" , 🟢 20:45 02/11 ⚽ AFC Champions League vs Pakhtakor (Chuối Lá) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoilahd/playlist.m3u8
-
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115618_75789a88.png" group-title="Chuối Chiên TV" , 🟢 22:00 02/11 ⚽ Ngoại Hạng Nga vs Krylia Sovetov (Chuối Tây) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoitayhd/playlist.m3u8
-
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115632_70f78cfe.png" group-title="Chuối Chiên TV" , 🟢 22:30 02/11 ⚽ Roma vs FC Voluntari (Chuối Sấy) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://gckc0525.edgemaxcdn.org/live/chuoisayhd/playlist.m3u8
-
 #EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115610_bd9cc718.png" group-title="Chuối Chiên TV" , 🟢 23:00 02/11 ⚽ AFC Champions League vs Al Sadd (Chuối Chao) [FHD] [hls] 
 #EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
 #EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
 https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoichaohd/playlist.m3u8
 
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_113434_59a0fece.png" group-title="Chuối Chiên TV" , 🟢 00:30 03/11 ⚽ Serie A vs Sassuolo (Trốc Tru) [FHD] [hls] 
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_113434_59a0fece.png" group-title="Chuối Chiên TV" , 🟢 00:30 03/11 ⚽ Serie A vs Sassuolo (Chuối Kem) [FHD] [hls] 
 #EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
 #EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://stm9ee346727718.stream.hdplaylink.com/cctvlive/troctruhd/playlist.m3u8
+https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoikemhd/playlist.m3u8
 
 #EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115610_bd9cc718.png" group-title="Chuối Chiên TV" , 🟢 01:15 03/11 ⚽ AFC Champions League vs Al-Gharafa (Chuối Nhỏ) [FHD] [hls] 
 #EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
 #EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
 https://gckc0525.edgemaxcdn.org/live/chuoinhohd/playlist.m3u8
+
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115610_bd9cc718.png" group-title="Chuối Chiên TV" , 🟢 01:15 03/11 ⚽ AFC Champions League vs Al-Ittihad FC (Chuối Chiên) [FHD] [hls] 
+#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoichienhd/playlist.m3u8
+
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_113434_59a0fece.png" group-title="Chuối Chiên TV" , 🟢 02:45 03/11 ⚽ Serie A vs Atalanta (Chuối Kem) [FHD] [hls] 
+#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoikemhd/playlist.m3u8
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/gb-eng.png" group-title="Chuối Chiên TV" , 🟢 03:00 03/11 ⚽ Ngoại Hạng Anh vs Newcastle (Chuối Lá) [FHD] [hls] 
+#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoilahd/playlist.m3u8
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/br.png" group-title="Chuối Chiên TV" , 🟢 06:00 03/11 ⚽ Brazil vs RB Bragantino (Chuối Tây) [FHD] [hls] 
+#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoitayhd/playlist.m3u8
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/co.png" group-title="Chuối Chiên TV" , 🟢 08:15 03/11 ⚽ Colombia vs Bucaramanga (Chuối Chao) [FHD] [hls] 
+#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoichaohd/playlist.m3u8
 
