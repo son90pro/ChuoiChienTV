@@ -1,15 +1,5 @@
 #EXTM3U
 
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115838_f553e052.png" group-title="Chuối Chiên TV" , 🟢 03:00 11/11 ⚽ UEFA Champions League Women vs Inter Milano W (Trốc Tru) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://stm9ee346727718.stream.hdplaylink.com/cctvlive/troctruhd/playlist.m3u8
-
-#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115838_f553e052.png" group-title="Chuối Chiên TV" , 🟢 03:00 11/11 ⚽ UEFA Champions League Women vs Paris Saint Germain W (Chuối Nhỏ) [FHD] [hls] 
-#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
-#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
-https://gckc0525.edgemaxcdn.org/live/chuoinhohd/playlist.m3u8
-
 #EXTINF:-1 tvg-logo="https://flagcdn.com/w320/co.png" group-title="Chuối Chiên TV" , 🟢 06:30 11/11 ⚽ Cúp Colombia vs Inter Bogotá (Trốc Tru) [FHD] [hls] 
 #EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
 #EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
@@ -44,4 +34,14 @@ https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoitayhd/playlist.m3u8
 #EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
 #EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
 https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoichienhd/playlist.m3u8
+
+#EXTINF:-1 tvg-logo="https://media.chuoichientv.net/media/20251115_115529_0cf25f68.png" group-title="Chuối Chiên TV" , 🟢 17:30 11/11 ⚽ J-League Cup vs Urawa (Chuối Kem) [FHD] [hls] 
+#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoikemhd/playlist.m3u8
+
+#EXTINF:-1 tvg-logo="https://flagcdn.com/w320/vn.png" group-title="Chuối Chiên TV" , 🟢 19:00 11/11 ⚽ Việt Nam vs Chinese Taipei (Chuối Chao) [FHD] [hls] 
+#EXTVLCOPT:http-referrer=https://live.chuoichien.tv/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+https://stm9ee346727718.stream.hdplaylink.com/cctvlive/chuoichaohd/playlist.m3u8
 
